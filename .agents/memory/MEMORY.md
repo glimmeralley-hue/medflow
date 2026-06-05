@@ -1,0 +1,3 @@
+- [Notes persistence](notes-persistence.md) — NotesSection was in-memory only; migrated to app_notes DB table with full CRUD.
+- [Category colors](category-colors.md) — CATEGORY_COLORS dict at module level drives event list coloring and completed-event styling.
+- [ExamDetailDialog notes](exam-detail-notes.md) — Has its own in-memory notes section (separate from NotesSection); self.notes must be initialized in __init__.

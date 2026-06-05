@@ -31,6 +31,18 @@ from PySide6.QtCharts import (
     QChart, QChartView, QLineSeries, QScatterSeries, QValueAxis, QDateTimeAxis
 )
 
+# Color mapping for event categories — used throughout the app
+CATEGORY_COLORS = {
+    "Lecture":          {"bg": "#E8F4FD", "fg": "#1A73E8", "dot": "#1A73E8"},
+    "Practical Lab":    {"bg": "#EDE7F6", "fg": "#7B1FA2", "dot": "#7B1FA2"},
+    "Dissection":       {"bg": "#FCE4EC", "fg": "#C62828", "dot": "#C62828"},
+    "Clinical Rotation":{"bg": "#E8F5E9", "fg": "#2E7D32", "dot": "#2E7D32"},
+    "Study Session":    {"bg": "#FFF3E0", "fg": "#E65100", "dot": "#E65100"},
+    "Exam":             {"bg": "#FFF8E1", "fg": "#F57F17", "dot": "#F57F17"},
+    "Tutorial":         {"bg": "#F3E5F5", "fg": "#6A1B9A", "dot": "#6A1B9A"},
+    "Other":            {"bg": "#ECEFF1", "fg": "#546E7A", "dot": "#546E7A"},
+}
+
 
 class Database:
     """SQLite database handler for MedFlow application"""
@@ -219,6 +231,18 @@ class Database:
                     note TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (book_id) REFERENCES library_books (id) ON DELETE CASCADE
+                )
+            """)
+
+            # General study notes (persisted across sessions)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS app_notes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    category TEXT DEFAULT 'General',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
             
@@ -653,6 +677,88 @@ class Database:
                 """)
             return [row[0] for row in cursor.fetchall()]
 
+    # ── App Notes (persistent general notes) ──────────────────────────────
+
+    def add_app_note(self, title: str, content: str, category: str = "General") -> int:
+        """Save a new general study note to the database"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO app_notes (title, content, category)
+                VALUES (?, ?, ?)
+            """, (title, content, category))
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_app_notes(self, search: str = None) -> List[Dict]:
+        """Get all general notes, optionally filtered by search text"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            if search:
+                cursor.execute("""
+                    SELECT * FROM app_notes
+                    WHERE title LIKE ? OR content LIKE ?
+                    ORDER BY updated_at DESC
+                """, (f"%{search}%", f"%{search}%"))
+            else:
+                cursor.execute("SELECT * FROM app_notes ORDER BY updated_at DESC")
+            columns = [desc[0] for desc in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    def update_app_note(self, note_id: int, title: str, content: str, category: str) -> bool:
+        """Update an existing note"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE app_notes
+                    SET title = ?, content = ?, category = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (title, content, category, note_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            print(f"Error updating note: {e}", file=sys.stderr)
+            return False
+
+    def delete_app_note(self, note_id: int) -> bool:
+        """Delete a note by ID"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM app_notes WHERE id = ?", (note_id,))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            print(f"Error deleting note: {e}", file=sys.stderr)
+            return False
+
+    def get_app_note_by_id(self, note_id: int) -> Optional[Dict]:
+        """Get a single note by ID"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM app_notes WHERE id = ?", (note_id,))
+            row = cursor.fetchone()
+            if row:
+                columns = [desc[0] for desc in cursor.description]
+                return dict(zip(columns, row))
+            return None
+
+    def mark_event_completed(self, event_id: int, completed: bool) -> bool:
+        """Toggle the completed state of an academic event"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE academic_events SET completed = ? WHERE id = ?",
+                    (1 if completed else 0, event_id)
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            print(f"Error marking event completed: {e}", file=sys.stderr)
+            return False
+
 
 class PulseTimer(QWidget):
     """Pomodoro-style timer with visual countdown"""
@@ -973,6 +1079,7 @@ class AcademicLedger(QWidget):
         # Add event button
         self.add_event_btn = QPushButton("➕ Add New Event")
         self.add_event_btn.setMinimumHeight(45)
+        self.add_event_btn.setToolTip("Add a new academic event for the selected date (Ctrl+N)")
         self.add_event_btn.clicked.connect(self.show_add_event_dialog)
         self.add_event_btn.setStyleSheet("""
             QPushButton {
@@ -1087,6 +1194,7 @@ class FullPageSchedulePlanner(QWidget):
         add_btn = QPushButton("➕ Add Event")
         add_btn.setMinimumHeight(48)
         add_btn.setMinimumWidth(150)
+        add_btn.setToolTip("Add a new event for the selected date  (Ctrl+N)")
         add_btn.setStyleSheet("""
             QPushButton {
                 background-color: #FF6B9D;
@@ -1559,6 +1667,8 @@ class FullPageSchedulePlanner(QWidget):
             }
         """)
         self.events_list.itemClicked.connect(self.on_event_selected)
+        self.events_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.events_list.customContextMenuRequested.connect(self._events_context_menu)
         events_layout.addWidget(self.events_list)
         
         events_group.setLayout(events_layout)
@@ -1627,12 +1737,37 @@ class FullPageSchedulePlanner(QWidget):
         for event in events:
             reminder_text = "🔔 " if event.get('reminder_enabled') else ""
             time_str = f"{event['time_start']} - {event['time_end']}"
-            text = f"{reminder_text}{time_str}\n{event['title']} ({event['category']})"
+            completed = bool(event.get('completed'))
+            done_mark = "✓ " if completed else ""
+
+            # Calculate duration for display
+            try:
+                h1, m1 = map(int, event['time_start'].split(":"))
+                h2, m2 = map(int, event['time_end'].split(":"))
+                dur = (h2 * 60 + m2) - (h1 * 60 + m1)
+                dur_str = f" · {dur}min" if dur > 0 else ""
+            except Exception:
+                dur_str = ""
+
+            text = f"{done_mark}{reminder_text}{time_str}{dur_str}\n{event['title']}  [{event['category']}]"
             if event.get('subtopic'):
                 text += f"\n  └ {event['subtopic']}"
             
             item = QListWidgetItem(text)
             item.setData(Qt.UserRole, event['id'])
+
+            # Color-code by category
+            colors = CATEGORY_COLORS.get(event['category'], CATEGORY_COLORS["Other"])
+            if completed:
+                item.setForeground(QColor("#AAAAAA"))
+                item.setBackground(QColor("#F5F5F5"))
+                font = item.font()
+                font.setStrikeOut(True)
+                item.setFont(font)
+            else:
+                item.setForeground(QColor(colors["fg"]))
+                item.setBackground(QColor(colors["bg"]))
+
             self.events_list.addItem(item)
         
         # Load upcoming reminders
@@ -1652,6 +1787,50 @@ class FullPageSchedulePlanner(QWidget):
         if dialog.exec():
             self.load_schedule()
     
+    def _events_context_menu(self, pos):
+        """Right-click context menu on the events list"""
+        item = self.events_list.itemAt(pos)
+        if not item:
+            return
+        event_id = item.data(Qt.UserRole)
+
+        # Find current completed state from DB
+        events = self.db.get_events(self.selected_date)
+        target = next((e for e in events if e['id'] == event_id), None)
+        if not target:
+            return
+
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: white;
+                border: 2px solid #FFD1DC;
+                border-radius: 10px;
+                padding: 6px;
+                font-size: 14px;
+                color: #4A4A4A;
+            }
+            QMenu::item {
+                padding: 8px 20px;
+                border-radius: 6px;
+            }
+            QMenu::item:selected {
+                background-color: #FFE4E8;
+                color: #FF6B9D;
+            }
+        """)
+
+        if target.get('completed'):
+            action_toggle = menu.addAction("↩ Mark as Incomplete")
+        else:
+            action_toggle = menu.addAction("✓ Mark as Complete")
+
+        action = menu.exec(self.events_list.mapToGlobal(pos))
+        if action == action_toggle:
+            new_state = not bool(target.get('completed'))
+            self.db.mark_event_completed(event_id, new_state)
+            self.load_schedule()
+
     def start_reminder_timer(self):
         """Start timer to check for reminders every minute"""
         self.reminder_timer = QTimer()
@@ -1969,12 +2148,21 @@ class AddEventDialog(QDialog):
         title = self.title_input.text().strip()
         if not title:
             QMessageBox.warning(self, "Missing Title", "Please enter an event title.")
+            self.title_input.setFocus()
             return
-        
+
         category = self.category_combo.currentText()
         subtopic = self.subtopic_input.text().strip()
         time_start = self.time_start.time().toString("HH:mm")
         time_end = self.time_end.time().toString("HH:mm")
+
+        # Validate that end time is after start time
+        if self.time_end.time() <= self.time_start.time():
+            QMessageBox.warning(self, "Invalid Time Range",
+                                "End time must be after start time.\n\nPlease adjust the times and try again.")
+            self.time_end.setFocus()
+            return
+
         notes = self.notes_input.toPlainText().strip()
         reminder_minutes = self.reminder_spin.value()
         reminder_enabled = self.reminder_checkbox.isChecked()
@@ -2258,7 +2446,7 @@ class NotesSection(QWidget):
     def __init__(self, database: Database):
         super().__init__()
         self.db = database
-        self.notes = []
+        self._editing_note_id: Optional[int] = None  # None = creating new note
         self.init_ui()
         self.load_notes()
 
@@ -2351,9 +2539,9 @@ class NotesSection(QWidget):
         buttons_layout = QHBoxLayout()
         buttons_layout.setSpacing(12)
 
-        add_btn = QPushButton("✍️ Save Note")
-        add_btn.setMinimumHeight(50)
-        add_btn.setStyleSheet("""
+        self.save_note_btn = QPushButton("✍️ Save Note")
+        self.save_note_btn.setMinimumHeight(50)
+        self.save_note_btn.setStyleSheet("""
             QPushButton {
                 background-color: #FF6B9D;
                 color: white;
@@ -2367,10 +2555,32 @@ class NotesSection(QWidget):
                 background-color: #FF8FA3;
             }
         """)
-        add_btn.clicked.connect(self.add_note)
-        buttons_layout.addWidget(add_btn)
+        self.save_note_btn.setToolTip("Save the current note (Ctrl+S)")
+        self.save_note_btn.setShortcut("Ctrl+S")
+        self.save_note_btn.clicked.connect(self.add_note)
+        buttons_layout.addWidget(self.save_note_btn)
 
-        export_btn = QPushButton("📤 Export Notes")
+        new_note_btn = QPushButton("➕ New Note")
+        new_note_btn.setMinimumHeight(50)
+        new_note_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FFE4E8;
+                color: #8B6B7A;
+                border: 2px solid #FFD1DC;
+                padding: 14px 24px;
+                font-weight: 600;
+                border-radius: 12px;
+                font-size: 15px;
+            }
+            QPushButton:hover {
+                background-color: #FFD1DC;
+            }
+        """)
+        new_note_btn.setToolTip("Clear the editor and start a brand new note")
+        new_note_btn.clicked.connect(self.clear_editor)
+        buttons_layout.addWidget(new_note_btn)
+
+        export_btn = QPushButton("📤 Export")
         export_btn.setMinimumHeight(50)
         export_btn.setStyleSheet("""
             QPushButton {
@@ -2386,6 +2596,7 @@ class NotesSection(QWidget):
                 background-color: #FFD1DC;
             }
         """)
+        export_btn.setToolTip("Export all notes to a text file")
         export_btn.clicked.connect(self.export_notes)
         buttons_layout.addWidget(export_btn)
 
@@ -2507,46 +2718,55 @@ class NotesSection(QWidget):
             QMessageBox.warning(self, "Missing Note", "Please enter both a title and note content.")
             return
 
-        note_id = max([note['id'] for note in self.notes], default=-1) + 1
-        note = {
-            'id': note_id,
-            'title': title,
-            'content': content,
-            'category': category,
-            'date': datetime.now().strftime("%Y-%m-%d %H:%M")
-        }
-        self.notes.append(note)
-        self.refresh_notes_list()
+        if self._editing_note_id is not None:
+            # Update existing note in DB
+            self.db.update_app_note(self._editing_note_id, title, content, category)
+        else:
+            # Create new note in DB
+            self.db.add_app_note(title, content, category)
+
+        self.clear_editor()
+        self.load_notes()
+
+    def clear_editor(self):
+        """Reset the editor to create a new note"""
+        self._editing_note_id = None
         self.note_title.clear()
         self.note_content.clear()
+        self.note_category.setCurrentIndex(0)
+        self.save_note_btn.setText("✍️ Save Note")
+        self.notes_list.clearSelection()
 
     def refresh_notes_list(self):
+        notes = self.db.get_app_notes()
         self.notes_list.clear()
-        for note in reversed(self.notes):
-            item_text = f"📄 {note['title']}\n   🏷️ {note['category']} • {note['date']}"
+        for note in notes:
+            ts = note.get('updated_at') or note.get('created_at', '')
+            item_text = f"📄 {note['title']}\n   🏷️ {note['category']} · {ts[:16]}"
             item = QListWidgetItem(item_text)
             item.setData(Qt.UserRole, note['id'])
             self.notes_list.addItem(item)
 
+        count = len(notes)
+        # Update group box title dynamically if it exists
+        parent = self.notes_list.parent()
+        if isinstance(parent, QWidget):
+            gb = parent.parent()
+            if hasattr(gb, 'setTitle'):
+                gb.setTitle(f"My Notes  ({count})")
+
     def load_notes(self):
-        if not self.notes:
-            self.notes.append({
-                'id': 0,
-                'title': "Welcome to MedFlow Notes",
-                'content': "Use this section to jot down quick study notes, clinical observations, or anything you need to remember. Select a note to edit it or double-click to read it in full.",
-                'category': "General",
-                'date': datetime.now().strftime("%Y-%m-%d %H:%M")
-            })
-            self.refresh_notes_list()
+        self.refresh_notes_list()
 
     def load_note(self, item: QListWidgetItem):
         note_id = item.data(Qt.UserRole)
-        for note in self.notes:
-            if note['id'] == note_id:
-                self.note_title.setText(note['title'])
-                self.note_category.setCurrentText(note['category'])
-                self.note_content.setText(note['content'])
-                break
+        note = self.db.get_app_note_by_id(note_id)
+        if note:
+            self._editing_note_id = note_id
+            self.note_title.setText(note['title'])
+            self.note_category.setCurrentText(note['category'])
+            self.note_content.setText(note['content'])
+            self.save_note_btn.setText("💾 Update Note")
 
     def delete_note(self):
         current_item = self.notes_list.currentItem()
@@ -2555,23 +2775,26 @@ class NotesSection(QWidget):
             return
 
         note_id = current_item.data(Qt.UserRole)
-        self.notes = [note for note in self.notes if note['id'] != note_id]
-        self.refresh_notes_list()
-        self.note_title.clear()
-        self.note_content.clear()
+        reply = QMessageBox.question(
+            self, "Delete Note",
+            "Are you sure you want to permanently delete this note?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            self.db.delete_app_note(note_id)
+            if self._editing_note_id == note_id:
+                self.clear_editor()
+            self.load_notes()
 
     def filter_notes(self, text: str):
-        if not text:
-            self.refresh_notes_list()
-            return
-
+        notes = self.db.get_app_notes(search=text if text else None)
         self.notes_list.clear()
-        for note in reversed(self.notes):
-            if text.lower() in note['title'].lower() or text.lower() in note['content'].lower():
-                item_text = f"📄 {note['title']}\n   🏷️ {note['category']} • {note['date']}"
-                item = QListWidgetItem(item_text)
-                item.setData(Qt.UserRole, note['id'])
-                self.notes_list.addItem(item)
+        for note in notes:
+            ts = note.get('updated_at') or note.get('created_at', '')
+            item_text = f"📄 {note['title']}\n   🏷️ {note['category']} · {ts[:16]}"
+            item = QListWidgetItem(item_text)
+            item.setData(Qt.UserRole, note['id'])
+            self.notes_list.addItem(item)
 
     def update_word_count(self):
         text = self.note_content.toPlainText()
@@ -2582,7 +2805,8 @@ class NotesSection(QWidget):
     def export_notes(self):
         from PySide6.QtWidgets import QFileDialog
 
-        if not self.notes:
+        notes = self.db.get_app_notes()
+        if not notes:
             QMessageBox.information(self, "No Notes", "No notes to export.")
             return
 
@@ -2602,16 +2826,16 @@ class NotesSection(QWidget):
                 f.write("MEDFLOW STUDY NOTES EXPORT\n")
                 f.write(f"Exported: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n")
                 f.write("=" * 60 + "\n\n")
-                for i, note in enumerate(reversed(self.notes), 1):
+                for i, note in enumerate(notes, 1):
                     f.write(f"{'-' * 60}\n")
                     f.write(f"NOTE #{i}\n")
                     f.write(f"{'-' * 60}\n")
                     f.write(f"Title: {note['title']}\n")
                     f.write(f"Category: {note['category']}\n")
-                    f.write(f"Date: {note['date']}\n\n")
+                    f.write(f"Date: {note.get('updated_at', '')[:16]}\n\n")
                     f.write(f"Content:\n{note['content']}\n\n")
                 f.write("=" * 60 + "\n")
-                f.write(f"Total Notes: {len(self.notes)}\n")
+                f.write(f"Total Notes: {len(notes)}\n")
             QMessageBox.information(self, "Export Successful", f"Notes exported to:\n{file_path}")
         except Exception as e:
             QMessageBox.critical(self, "Export Failed", f"Error: {str(e)}")
@@ -2625,8 +2849,10 @@ class NotesSection(QWidget):
             return
 
         note_id = current_item.data(Qt.UserRole)
-        note = next((note for note in self.notes if note['id'] == note_id), None)
+        note = self.db.get_app_note_by_id(note_id)
         if note:
+            # Remap key names so NoteReaderDialog gets what it expects
+            note.setdefault('date', note.get('updated_at', '')[:16])
             dialog = NoteReaderDialog(note, self)
             dialog.exec()
 
@@ -3241,6 +3467,7 @@ class ExamDetailDialog(QDialog):
     def __init__(self, exam_data: dict, parent=None):
         super().__init__(parent)
         self.exam = exam_data
+        self.notes: List[Dict] = []  # in-memory notes for this session
         self.setWindowTitle(f"📊 {exam_data['subject_name']} - Exam Details")
         self.setMinimumSize(500, 400)
         self.init_ui()
@@ -4825,7 +5052,9 @@ class LibrarySection(QWidget):
     
     def create_book_card(self, book):
         card = QFrame()
-        card.setFixedSize(200, 260)
+        card.setMinimumSize(200, 270)
+        card.setMaximumWidth(260)
+        card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         card.setStyleSheet("""
             QFrame {
                 background-color: white;
@@ -4834,26 +5063,27 @@ class LibrarySection(QWidget):
             }
             QFrame:hover {
                 border: 2px solid #FF6B9D;
+                background-color: #FFFAFA;
             }
         """)
         
         layout = QVBoxLayout()
-        layout.setSpacing(8)
+        layout.setSpacing(7)
         layout.setContentsMargins(12, 12, 12, 12)
         
         # Book cover/icon area
         cover = QLabel("📖" if not book.get('is_read') else "✅")
         cover.setAlignment(Qt.AlignCenter)
         cover.setStyleSheet("""
-            font-size: 60px;
+            font-size: 52px;
             background-color: #FFF5F7;
             border-radius: 10px;
-            padding: 15px;
+            padding: 12px;
         """)
         layout.addWidget(cover)
         
-        # Title - truncate if too long
-        title_text = book['title'][:25] + "..." if len(book['title']) > 25 else book['title']
+        # Title
+        title_text = book['title']
         title = QLabel(title_text)
         title.setStyleSheet("""
             font-size: 13px;
@@ -4861,6 +5091,7 @@ class LibrarySection(QWidget):
             color: #4A4A4A;
         """)
         title.setWordWrap(True)
+        title.setToolTip(title_text)
         layout.addWidget(title)
         
         # Author
@@ -4882,6 +5113,32 @@ class LibrarySection(QWidget):
         """)
         layout.addWidget(cat_label)
         
+        # Reading progress bar (only shown when pages info is available)
+        pages = book.get('pages') or 0
+        current_page = book.get('current_page') or 0
+        if pages > 0:
+            progress_pct = min(100, int(current_page / pages * 100))
+            prog_label = QLabel(f"p.{current_page}/{pages}  ({progress_pct}%)")
+            prog_label.setStyleSheet("font-size: 10px; color: #8B6B7A;")
+            layout.addWidget(prog_label)
+            from PySide6.QtWidgets import QProgressBar
+            prog_bar = QProgressBar()
+            prog_bar.setValue(progress_pct)
+            prog_bar.setFixedHeight(6)
+            prog_bar.setTextVisible(False)
+            prog_bar.setStyleSheet("""
+                QProgressBar {
+                    border: none;
+                    border-radius: 3px;
+                    background-color: #FFE4E8;
+                }
+                QProgressBar::chunk {
+                    background-color: #FF6B9D;
+                    border-radius: 3px;
+                }
+            """)
+            layout.addWidget(prog_bar)
+
         # Rating stars
         if book.get('rating'):
             stars = QLabel("⭐" * book['rating'])
@@ -5104,6 +5361,42 @@ class MedFlowMainWindow(QMainWindow):
         self.tab_widget.addTab(self.profile_page, "👤 Profile")
         
         self.setCentralWidget(self.tab_widget)
+
+        # Status bar with live clock and date
+        self._status_bar = self.statusBar()
+        self._status_bar.setStyleSheet("""
+            QStatusBar {
+                background-color: #FFE4E8;
+                color: #8B6B7A;
+                font-size: 13px;
+                padding: 4px 12px;
+                border-top: 1px solid #FFD1DC;
+            }
+        """)
+        self._clock_label = QLabel()
+        self._status_bar.addPermanentWidget(self._clock_label)
+        self._update_clock()
+        self._clock_timer = QTimer(self)
+        self._clock_timer.timeout.connect(self._update_clock)
+        self._clock_timer.start(30000)  # refresh every 30 s
+
+        # Keyboard shortcut: Ctrl+N → add event on Planner tab
+        add_event_shortcut = QAction("Add Event", self)
+        add_event_shortcut.setShortcut("Ctrl+N")
+        add_event_shortcut.triggered.connect(self._shortcut_add_event)
+        self.addAction(add_event_shortcut)
+
+    def _update_clock(self):
+        now = datetime.now()
+        day_str = now.strftime("%A, %B %-d %Y")
+        time_str = now.strftime("%-I:%M %p")
+        self._clock_label.setText(f"📅  {day_str}   🕐  {time_str}")
+
+    def _shortcut_add_event(self):
+        """Ctrl+N: switch to the Planner tab and open Add Event dialog"""
+        self.tab_widget.setCurrentIndex(0)
+        if hasattr(self.schedule_planner, 'show_add_event_dialog'):
+            self.schedule_planner.show_add_event_dialog()
     
     def create_dashboard_tab(self):
         """Create the main schedule tab with clean 3-pane layout"""
