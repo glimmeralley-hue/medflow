@@ -22,14 +22,16 @@ from PySide6.QtWidgets import (
     QCheckBox, QStackedWidget, QSizePolicy
 )
 from PySide6.QtCore import (
-    QTimer, QTime, Qt, QDateTime, QThread, Signal, QRect, QSize
+    QTimer, QTime, Qt, QDateTime, QThread, Signal, QRect, QSize, QUrl
 )
 from PySide6.QtGui import (
     QIcon, QPainter, QColor, QPen, QBrush, QFont, QPalette, QAction
 )
 from PySide6.QtCharts import (
-    QChart, QChartView, QLineSeries, QScatterSeries, QValueAxis, QDateTimeAxis
+    QChart, QChartView, QLineSeries, QScatterSeries, QValueAxis, QDateTimeAxis,
+    QBarSeries, QBarSet, QBarCategoryAxis
 )
+from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 
 # Color mapping for event categories — used throughout the app
 CATEGORY_COLORS = {
@@ -761,235 +763,309 @@ class Database:
 
 
 class PulseTimer(QWidget):
-    """Pomodoro-style timer with visual countdown"""
-    
+    """Pomodoro-style timer — pink-themed, with session counter and break mode."""
+
     timer_finished = Signal()
-    
+
+    # Modes
+    MODE_WORK  = "work"
+    MODE_BREAK = "break"
+
+    PRESETS = {
+        "🍅  Pomodoro  25 min":  (25, 5),
+        "🧠  Deep Work  50 min": (50, 10),
+        "⚡  Blitz  15 min":     (15, 3),
+    }
+
     def __init__(self):
         super().__init__()
-        self.total_time = 25 * 60  # Track the original duration for progress ring
-        self.time_remaining = 25 * 60  # 25 minutes default
-        self.is_running = False
-        self.timer = QTimer()
+        self.total_time     = 25 * 60
+        self.time_remaining = 25 * 60
+        self.break_time     = 5  * 60
+        self.is_running     = False
+        self.mode           = self.MODE_WORK
+        self.sessions_done  = 0
+
+        self._pulse_tick = 0
+        self._pulse_timer = QTimer(self)
+        self._pulse_timer.timeout.connect(self._pulse_ring)
+
+        self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_timer)
         self.init_ui()
-    
+
+    # ── UI ──────────────────────────────────────────────────────────────────
+
     def init_ui(self):
-        layout = QVBoxLayout()
-        layout.setSpacing(25)
-        layout.setContentsMargins(30, 30, 30, 30)
-        
-        # Title
-        title = QLabel("⏱️ Focus Timer")
-        title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("font-size: 22px; font-weight: bold; color: #00D4FF;")
-        layout.addWidget(title)
-        
-        # Progress ring (custom widget)
+        layout = QVBoxLayout(self)
+        layout.setSpacing(14)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        # ── Header row ────────────────────────────────────────────────────
+        header = QHBoxLayout()
+        self._title_lbl = QLabel("⏱️  Focus Timer")
+        self._title_lbl.setStyleSheet(
+            "font-size: 18px; font-weight: 700; color: #FF6B9D;"
+        )
+        header.addWidget(self._title_lbl)
+        header.addStretch()
+
+        self._session_lbl = QLabel("Sessions: 0")
+        self._session_lbl.setStyleSheet(
+            "font-size: 12px; color: #8B6B7A;"
+            "background:#FFE4E8; padding:4px 10px; border-radius:10px;"
+        )
+        header.addWidget(self._session_lbl)
+        layout.addLayout(header)
+
+        # ── Mode badge ────────────────────────────────────────────────────
+        self._mode_lbl = QLabel("FOCUS")
+        self._mode_lbl.setAlignment(Qt.AlignCenter)
+        self._mode_lbl.setStyleSheet(
+            "font-size: 11px; font-weight: 700; letter-spacing: 2px;"
+            "color: white; background: #FF6B9D;"
+            "padding: 4px 16px; border-radius: 10px;"
+        )
+        layout.addWidget(self._mode_lbl, 0, Qt.AlignCenter)
+
+        # ── Progress ring ─────────────────────────────────────────────────
         self.progress_ring = ProgressRing()
-        self.progress_ring.setFixedSize(250, 250)
+        self.progress_ring.setFixedSize(210, 210)
         layout.addWidget(self.progress_ring, 0, Qt.AlignCenter)
-        
-        # Timer display
+
+        # ── Time label (drawn inside ring via overlay trick) ──────────────
         self.timer_label = QLabel("25:00")
         self.timer_label.setAlignment(Qt.AlignCenter)
-        self.timer_label.setStyleSheet("""
-            QLabel {
-                font-size: 56px;
-                font-weight: bold;
-                color: #00D4FF;
-                background: transparent;
-                padding: 20px;
-            }
-        """)
+        self.timer_label.setStyleSheet(
+            "font-size: 48px; font-weight: 700; color: #FF6B9D;"
+            "background: transparent; letter-spacing: 2px;"
+        )
         layout.addWidget(self.timer_label)
-        
-        # Control buttons
-        button_layout = QHBoxLayout()
-        button_layout.setSpacing(15)
-        
-        self.start_btn = QPushButton("▶ Start")
-        self.start_btn.setMinimumHeight(50)
+
+        # ── Preset selector ───────────────────────────────────────────────
+        self._preset_combo = QComboBox()
+        self._preset_combo.addItems(list(self.PRESETS.keys()))
+        self._preset_combo.setMinimumHeight(36)
+        self._preset_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #FFF5F7;
+                color: #4A4A4A;
+                border: 2px solid #FFD1DC;
+                padding: 6px 12px;
+                border-radius: 10px;
+                font-size: 13px;
+            }
+            QComboBox:focus { border: 2px solid #FF6B9D; }
+        """)
+        self._preset_combo.currentTextChanged.connect(self._on_preset_changed)
+        layout.addWidget(self._preset_combo)
+
+        # ── Control buttons ───────────────────────────────────────────────
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
+
+        self.start_btn = QPushButton("▶  Start")
+        self.start_btn.setMinimumHeight(44)
+        self.start_btn.setStyleSheet(self._btn_css("#FF6B9D", "white", "#FF8FA3"))
         self.start_btn.clicked.connect(self.start_timer)
-        self.start_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #00D4FF;
-                color: #0A0E14;
-                border: none;
-                padding: 15px 30px;
-                font-weight: bold;
-                border-radius: 10px;
-                font-size: 16px;
-            }
-            QPushButton:hover {
-                background-color: #00A8CC;
-            }
-        """)
-        
-        self.stop_btn = QPushButton("⏸ Stop")
-        self.stop_btn.setMinimumHeight(50)
+        self.start_btn.setToolTip("Start / resume the timer  (Space)")
+        btn_row.addWidget(self.start_btn)
+
+        self.stop_btn = QPushButton("⏸  Pause")
+        self.stop_btn.setMinimumHeight(44)
+        self.stop_btn.setStyleSheet(self._btn_css("#FFE4E8", "#8B6B7A", "#FFD1DC", border="#FFD1DC"))
         self.stop_btn.clicked.connect(self.stop_timer)
-        self.stop_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #FF6B6B;
-                color: white;
-                border: none;
-                padding: 15px 30px;
-                font-weight: bold;
-                border-radius: 10px;
-                font-size: 16px;
-            }
-            QPushButton:hover {
-                background-color: #FF5252;
-            }
-        """)
-        
-        self.reset_btn = QPushButton("↺ Reset")
-        self.reset_btn.setMinimumHeight(50)
+        btn_row.addWidget(self.stop_btn)
+
+        self.reset_btn = QPushButton("↺  Reset")
+        self.reset_btn.setMinimumHeight(44)
+        self.reset_btn.setStyleSheet(self._btn_css("#FFE4E8", "#8B6B7A", "#FFD1DC", border="#FFD1DC"))
         self.reset_btn.clicked.connect(self.reset_timer)
-        self.reset_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #4A5568;
-                color: white;
-                border: none;
-                padding: 15px 30px;
-                font-weight: bold;
-                border-radius: 10px;
-                font-size: 16px;
-            }
-            QPushButton:hover {
-                background-color: #5A6578;
-            }
-        """)
-        
-        button_layout.addWidget(self.start_btn)
-        button_layout.addWidget(self.stop_btn)
-        button_layout.addWidget(self.reset_btn)
-        layout.addLayout(button_layout)
-        
-        # Preset buttons
-        preset_layout = QHBoxLayout()
-        preset_layout.setSpacing(15)
-        
-        self.deep_work_btn = QPushButton("🧠 Deep Work (50 min)")
-        self.deep_work_btn.setMinimumHeight(45)
-        self.deep_work_btn.clicked.connect(lambda: self.set_preset(50, 10))
-        self.deep_work_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #2A3F5F;
-                color: #E0E0E0;
-                border: none;
-                padding: 12px 25px;
-                font-size: 14px;
-                border-radius: 8px;
-            }
-            QPushButton:hover {
-                background-color: #3A4F6F;
-            }
-        """)
-        
-        self.flashcard_btn = QPushButton("⚡ Flashcard Blitz (25 min)")
-        self.flashcard_btn.setMinimumHeight(45)
-        self.flashcard_btn.clicked.connect(lambda: self.set_preset(25, 5))
-        self.flashcard_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #2A3F5F;
-                color: #E0E0E0;
-                border: none;
-                padding: 12px 25px;
-                font-size: 14px;
-                border-radius: 8px;
-            }
-            QPushButton:hover {
-                background-color: #3A4F6F;
-            }
-        """)
-        
-        preset_layout.addWidget(self.deep_work_btn)
-        preset_layout.addWidget(self.flashcard_btn)
-        layout.addLayout(preset_layout)
-        
+        btn_row.addWidget(self.reset_btn)
+
+        layout.addLayout(btn_row)
+
+        # ── Break button ──────────────────────────────────────────────────
+        self._break_btn = QPushButton("☕  Take a Break")
+        self._break_btn.setMinimumHeight(38)
+        self._break_btn.setStyleSheet(self._btn_css("#FFF3E0", "#E65100", "#FFE0B2", border="#FFE0B2"))
+        self._break_btn.clicked.connect(self._start_break)
+        self._break_btn.setToolTip("Switch to a short break countdown")
+        layout.addWidget(self._break_btn)
+
         layout.addStretch()
-        self.setLayout(layout)
-    
+
+    # ── helpers ─────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _btn_css(bg, fg, hover_bg, border="none"):
+        border_decl = f"border: 2px solid {border};" if border != "none" else "border: none;"
+        return f"""
+            QPushButton {{
+                background-color: {bg};
+                color: {fg};
+                {border_decl}
+                padding: 10px 18px;
+                font-weight: 600;
+                border-radius: 10px;
+                font-size: 14px;
+            }}
+            QPushButton:hover {{ background-color: {hover_bg}; }}
+            QPushButton:pressed {{ opacity: 0.85; }}
+        """
+
+    def _on_preset_changed(self, text: str):
+        work_min, break_min = self.PRESETS[text]
+        self.break_time = break_min * 60
+        self.stop_timer()
+        self.total_time     = work_min * 60
+        self.time_remaining = work_min * 60
+        self.mode = self.MODE_WORK
+        self._update_mode_ui()
+        self.update_display()
+
+    def _update_mode_ui(self):
+        if self.mode == self.MODE_WORK:
+            self._mode_lbl.setText("FOCUS")
+            self._mode_lbl.setStyleSheet(
+                "font-size: 11px; font-weight: 700; letter-spacing: 2px;"
+                "color: white; background: #FF6B9D;"
+                "padding: 4px 16px; border-radius: 10px;"
+            )
+            self.timer_label.setStyleSheet(
+                "font-size: 48px; font-weight: 700; color: #FF6B9D;"
+                "background: transparent; letter-spacing: 2px;"
+            )
+        else:
+            self._mode_lbl.setText("BREAK ☕")
+            self._mode_lbl.setStyleSheet(
+                "font-size: 11px; font-weight: 700; letter-spacing: 2px;"
+                "color: white; background: #E65100;"
+                "padding: 4px 16px; border-radius: 10px;"
+            )
+            self.timer_label.setStyleSheet(
+                "font-size: 48px; font-weight: 700; color: #E65100;"
+                "background: transparent; letter-spacing: 2px;"
+            )
+
+    def _pulse_ring(self):
+        """Animate ring color while running"""
+        self._pulse_tick = (self._pulse_tick + 1) % 2
+        alpha = 180 if self._pulse_tick == 0 else 255
+        self.progress_ring.set_pulse_alpha(alpha)
+
+    # ── Timer control ────────────────────────────────────────────────────────
+
     def start_timer(self):
         if not self.is_running:
             self.is_running = True
-            self.timer.start(1000)  # Update every second
-    
+            self.start_btn.setText("⏸  Running…")
+            self.start_btn.setStyleSheet(self._btn_css("#FFD1DC", "#FF6B9D", "#FFB6C1"))
+            self.timer.start(1000)
+            self._pulse_timer.start(600)
+
     def stop_timer(self):
         self.is_running = False
+        self.start_btn.setText("▶  Start")
+        self.start_btn.setStyleSheet(self._btn_css("#FF6B9D", "white", "#FF8FA3"))
         self.timer.stop()
-    
+        self._pulse_timer.stop()
+        self.progress_ring.set_pulse_alpha(255)
+
     def reset_timer(self):
         self.stop_timer()
+        self.mode = self.MODE_WORK
         self.time_remaining = self.total_time
+        self._update_mode_ui()
         self.update_display()
-    
+
+    def _start_break(self):
+        self.stop_timer()
+        self.mode = self.MODE_BREAK
+        self.time_remaining = self.break_time
+        self.total_time = self.break_time
+        self._update_mode_ui()
+        self.update_display()
+        self.start_timer()
+
     def set_preset(self, work_minutes: int, break_minutes: int):
-        self.total_time = work_minutes * 60
+        self.break_time = break_minutes * 60
+        self.stop_timer()
+        self.total_time     = work_minutes * 60
         self.time_remaining = work_minutes * 60
+        self.mode = self.MODE_WORK
+        self._update_mode_ui()
         self.update_display()
-    
+
     def update_timer(self):
         if self.time_remaining > 0:
             self.time_remaining -= 1
             self.update_display()
         else:
             self.stop_timer()
+            if self.mode == self.MODE_WORK:
+                self.sessions_done += 1
+                self._session_lbl.setText(f"Sessions: {self.sessions_done}")
             self.timer_finished.emit()
-    
+
     def update_display(self):
         minutes = self.time_remaining // 60
         seconds = self.time_remaining % 60
         self.timer_label.setText(f"{minutes:02d}:{seconds:02d}")
-        
-        # Update progress ring
         progress = 1.0 - (self.time_remaining / self.total_time) if self.total_time > 0 else 0.0
         self.progress_ring.set_progress(max(0.0, min(1.0, progress)))
 
 
 class ProgressRing(QWidget):
-    """Custom progress ring widget"""
-    
+    """Custom progress ring widget — pink-themed with optional pulse alpha."""
+
     def __init__(self):
         super().__init__()
-        self.progress = 0.0
-    
+        self.progress    = 0.0
+        self._pulse_alpha = 255  # 255 = fully visible, lower = dimmed for pulse
+
     def set_progress(self, value: float):
         self.progress = value
         self.update()
-    
+
+    def set_pulse_alpha(self, alpha: int):
+        self._pulse_alpha = alpha
+        self.update()
+
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        
-        # Background ring (soft light pink border)
-        painter.setPen(QPen(QColor("#FFE4E8"), 8))
-        painter.drawEllipse(10, 10, 180, 180)
-        
-        start_angle = 90 * 16  # Start from top
-        span_angle = -self.progress * 360 * 16  # Negative for clockwise
-        
-        # Glow layer 1 (Wide & soft pink bloom)
-        glow_pen1 = QPen(QColor(255, 107, 157, 30), 16)
-        painter.setPen(glow_pen1)
-        painter.drawArc(10, 10, 180, 180, start_angle, span_angle)
-        
-        # Glow layer 2 (Medium pink neon aura)
-        glow_pen2 = QPen(QColor(255, 107, 157, 100), 10)
-        painter.setPen(glow_pen2)
-        painter.drawArc(10, 10, 180, 180, start_angle, span_angle)
-        
-        # Core layer (Vibrant pink core)
-        core_pen = QPen(QColor("#FF6B9D"), 6)
-        painter.setPen(core_pen)
-        painter.drawArc(10, 10, 180, 180, start_angle, span_angle)
-        
-        # Center high-intensity highlight
-        center_pen = QPen(QColor("#FFFFFF"), 2)
-        painter.setPen(center_pen)
-        painter.drawArc(10, 10, 180, 180, start_angle, span_angle)
+
+        w, h = self.width(), self.height()
+        margin = 12
+        rect_size = min(w, h) - margin * 2
+
+        # Background track
+        painter.setPen(QPen(QColor("#FFE4E8"), 9))
+        painter.drawEllipse(margin, margin, rect_size, rect_size)
+
+        if self.progress <= 0:
+            return
+
+        start_angle = 90 * 16
+        span_angle  = -int(self.progress * 360 * 16)
+        a           = self._pulse_alpha
+
+        # Glow bloom
+        painter.setPen(QPen(QColor(255, 107, 157, max(0, min(50, int(a * 0.2)))), 18))
+        painter.drawArc(margin, margin, rect_size, rect_size, start_angle, span_angle)
+
+        # Soft halo
+        painter.setPen(QPen(QColor(255, 107, 157, max(0, min(130, int(a * 0.5)))), 11))
+        painter.drawArc(margin, margin, rect_size, rect_size, start_angle, span_angle)
+
+        # Core arc
+        painter.setPen(QPen(QColor(255, 107, 157, a), 7))
+        painter.drawArc(margin, margin, rect_size, rect_size, start_angle, span_angle)
+
+        # Highlight
+        painter.setPen(QPen(QColor(255, 255, 255, max(0, min(220, int(a * 0.86)))), 2))
+        painter.drawArc(margin, margin, rect_size, rect_size, start_angle, span_angle)
 
 
 class AcademicLedger(QWidget):
@@ -1006,37 +1082,52 @@ class AcademicLedger(QWidget):
     
     def init_ui(self):
         layout = QVBoxLayout()
-        layout.setSpacing(20)
+        layout.setSpacing(15)
         layout.setContentsMargins(20, 20, 20, 20)
         
         # Title
         title = QLabel("📅 Schedule & Events")
-        title.setStyleSheet("font-size: 20px; font-weight: bold; color: #00D4FF;")
+        title.setStyleSheet("font-size: 18px; font-weight: 700; color: #FF6B9D;")
         layout.addWidget(title)
         
-        # Calendar
+        # Calendar — light pink theme
         self.calendar = QCalendarWidget()
-        self.calendar.setMinimumHeight(300)
+        self.calendar.setMinimumHeight(280)
         self.calendar.setStyleSheet("""
             QCalendarWidget {
-                background-color: #1A1F2E;
-                color: #E0E0E0;
-                font-size: 14px;
+                background-color: white;
+                color: #4A4A4A;
+                font-size: 13px;
+                border: 2px solid #FFD1DC;
+                border-radius: 12px;
             }
             QCalendarWidget QToolButton {
-                color: #00D4FF;
-                background-color: #2A3F5F;
-                padding: 10px;
-                font-size: 14px;
+                color: #FF6B9D;
+                background-color: #FFF5F7;
+                padding: 8px;
+                font-size: 13px;
+                font-weight: 600;
+                border: none;
+                border-radius: 6px;
+            }
+            QCalendarWidget QToolButton:hover {
+                background-color: #FFD1DC;
             }
             QCalendarWidget QAbstractItemView {
-                background-color: #1A1F2E;
-                selection-color: #00D4FF;
-                selection-background-color: #2A3F5F;
+                background-color: white;
+                color: #4A4A4A;
+                selection-color: white;
+                selection-background-color: #FF6B9D;
                 font-size: 13px;
+                outline: none;
             }
             QCalendarWidget QAbstractItemView:enabled {
-                padding: 5px;
+                padding: 4px;
+            }
+            QCalendarWidget QWidget#qt_calendar_navigationbar {
+                background-color: #FFF5F7;
+                border-bottom: 1px solid #FFD1DC;
+                border-radius: 10px;
             }
         """)
         self.calendar.clicked.connect(self.on_date_selected)
@@ -1044,33 +1135,32 @@ class AcademicLedger(QWidget):
         
         # Events section
         events_label = QLabel("📌 Events for Selected Date")
-        events_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #00D4FF; margin-top: 10px;")
+        events_label.setStyleSheet("font-size: 14px; font-weight: 600; color: #FF6B9D; margin-top: 6px;")
         layout.addWidget(events_label)
         
         # Event list
         self.event_list = QListWidget()
-        self.event_list.setMinimumHeight(200)
+        self.event_list.setMinimumHeight(180)
         self.event_list.setStyleSheet("""
             QListWidget {
-                background-color: #1A1F2E;
-                color: #E0E0E0;
-                border: 1px solid #333333;
+                background-color: #FFF5F7;
+                color: #4A4A4A;
+                border: 2px solid #FFD1DC;
                 border-radius: 10px;
-                padding: 10px;
-                font-size: 14px;
+                padding: 8px;
+                font-size: 13px;
             }
             QListWidget::item {
-                padding: 12px;
-                border-bottom: 1px solid #333333;
-                border-radius: 5px;
+                padding: 10px;
+                border-radius: 6px;
                 margin: 2px 0px;
             }
             QListWidget::item:selected {
-                background-color: #2A3F5F;
-                color: #00D4FF;
+                background-color: #FFD1DC;
+                color: #FF6B9D;
             }
             QListWidget::item:hover {
-                background-color: #253550;
+                background-color: #FFE4E8;
             }
         """)
         self.event_list.itemClicked.connect(self.on_event_selected)
@@ -3128,37 +3218,58 @@ class ResultsLedger(QWidget):
         """)
         graph_layout = QVBoxLayout()
         
-        # Create chart
+        # ── Tab widget: Correlation scatter + Per-subject bar ─────────────
+        self._chart_tabs = QTabWidget()
+        self._chart_tabs.setStyleSheet("""
+            QTabBar::tab {
+                background: #FFE4E8; color: #8B6B7A;
+                padding: 6px 16px; border-radius: 8px 8px 0 0;
+                font-size: 13px;
+            }
+            QTabBar::tab:selected { background: #FF6B9D; color: white; }
+        """)
+
+        # ── Chart 1: Correlation scatter ──────────────────────────────────
         self.chart = QChart()
-        self.chart.setTitle("Study Hours vs Exam Score Correlation")
-        self.chart.setTitleBrush(QBrush(QColor("#4A4A4A")))
+        self.chart.setTitle("Study Hours  ×  Exam Score")
+        font = QFont(); font.setBold(True); font.setPointSize(11)
+        self.chart.setTitleFont(font)
+        self.chart.setTitleBrush(QBrush(QColor("#FF6B9D")))
         self.chart.setBackgroundBrush(QBrush(QColor("#FFF8FA")))
         self.chart.setAnimationOptions(QChart.SeriesAnimations)
-        
-        # Create scatter series for better visualization
+        self.chart.legend().setVisible(True)
+        self.chart.legend().setAlignment(Qt.AlignBottom)
+
         self.study_hours_series = QScatterSeries()
         self.study_hours_series.setName("Study Hours")
-        self.study_hours_series.setMarkerSize(12)
+        self.study_hours_series.setMarkerSize(14)
         self.study_hours_series.setColor(QColor("#FF6B9D"))
         self.study_hours_series.setBorderColor(QColor("white"))
-        
+
         self.exam_score_series = QScatterSeries()
         self.exam_score_series.setName("Exam Score (%)")
-        self.exam_score_series.setMarkerSize(10)
-        self.exam_score_series.setColor(QColor("#FFB6C1"))
+        self.exam_score_series.setMarkerSize(12)
+        self.exam_score_series.setColor(QColor("#B39DDB"))
         self.exam_score_series.setBorderColor(QColor("white"))
-        
+
+        # Trend line for scores
+        self._trend_series = QLineSeries()
+        self._trend_series.setName("Score trend")
+        trend_pen = QPen(QColor("#FF6B9D")); trend_pen.setWidth(2)
+        trend_pen.setStyle(Qt.DashLine)
+        self._trend_series.setPen(trend_pen)
+
         self.chart.addSeries(self.study_hours_series)
         self.chart.addSeries(self.exam_score_series)
-        
-        # Create axes with grid lines
+        self.chart.addSeries(self._trend_series)
+
         self.axis_x = QValueAxis()
         self.axis_x.setTitleText("Exam #")
         self.axis_x.setTitleBrush(QBrush(QColor("#4A4A4A")))
         self.axis_x.setLabelsBrush(QBrush(QColor("#4A4A4A")))
         self.axis_x.setGridLineColor(QColor("#FFE4E8"))
         self.axis_x.setMinorGridLineColor(QColor("#FFF5F7"))
-        
+
         self.axis_y_hours = QValueAxis()
         self.axis_y_hours.setTitleText("Study Hours")
         self.axis_y_hours.setTitleBrush(QBrush(QColor("#FF6B9D")))
@@ -3166,48 +3277,80 @@ class ResultsLedger(QWidget):
         self.axis_y_hours.setGridLineColor(QColor("#FFE4E8"))
         self.axis_y_hours.setMinorGridLineVisible(True)
         self.axis_y_hours.setMinorGridLineColor(QColor("#FFF5F7"))
-        
+
         self.axis_y_score = QValueAxis()
         self.axis_y_score.setTitleText("Score (%)")
-        self.axis_y_score.setTitleBrush(QBrush(QColor("#FFB6C1")))
-        self.axis_y_score.setLabelsBrush(QBrush(QColor("#FFB6C1")))
-        
+        self.axis_y_score.setRange(0, 100)
+        self.axis_y_score.setTitleBrush(QBrush(QColor("#7E57C2")))
+        self.axis_y_score.setLabelsBrush(QBrush(QColor("#7E57C2")))
+
         self.chart.addAxis(self.axis_x, Qt.AlignBottom)
         self.chart.addAxis(self.axis_y_hours, Qt.AlignLeft)
         self.chart.addAxis(self.axis_y_score, Qt.AlignRight)
-        
+
         self.study_hours_series.attachAxis(self.axis_x)
         self.study_hours_series.attachAxis(self.axis_y_hours)
         self.exam_score_series.attachAxis(self.axis_x)
         self.exam_score_series.attachAxis(self.axis_y_score)
+        self._trend_series.attachAxis(self.axis_x)
+        self._trend_series.attachAxis(self.axis_y_score)
+
+        # ── Chart 2: Per-subject average bar chart ────────────────────────
+        self._bar_chart = QChart()
+        self._bar_chart.setTitle("Average Score by Subject")
+        self._bar_chart.setTitleFont(font)
+        self._bar_chart.setTitleBrush(QBrush(QColor("#FF6B9D")))
+        self._bar_chart.setBackgroundBrush(QBrush(QColor("#FFF8FA")))
+        self._bar_chart.setAnimationOptions(QChart.SeriesAnimations)
+        self._bar_chart.legend().setVisible(False)
+
+        self._bar_set  = QBarSet("Avg Score")
+        self._bar_set.setColor(QColor("#FF6B9D"))
+        self._bar_set.setBorderColor(QColor("#FF6B9D"))
+        self._bar_series = QBarSeries()
+        self._bar_series.append(self._bar_set)
+        self._bar_chart.addSeries(self._bar_series)
+
+        self._bar_axis_x = QBarCategoryAxis()
+        self._bar_axis_y = QValueAxis()
+        self._bar_axis_y.setRange(0, 100)
+        self._bar_axis_y.setTitleText("Avg Score (%)")
+        self._bar_axis_y.setTitleBrush(QBrush(QColor("#FF6B9D")))
+        self._bar_axis_y.setLabelsBrush(QBrush(QColor("#4A4A4A")))
+        self._bar_axis_y.setGridLineColor(QColor("#FFE4E8"))
+        self._bar_chart.addAxis(self._bar_axis_x, Qt.AlignBottom)
+        self._bar_chart.addAxis(self._bar_axis_y, Qt.AlignLeft)
+        self._bar_series.attachAxis(self._bar_axis_x)
+        self._bar_series.attachAxis(self._bar_axis_y)
         
-        # Chart view with pink theme
+        # ── Chart views ───────────────────────────────────────────────────
+        _cv_style = "QChartView { background-color: #FFF8FA; border-radius: 10px; }"
+
         self.chart_view = QChartView(self.chart)
         self.chart_view.setRenderHint(QPainter.Antialiasing)
-        self.chart_view.setMinimumHeight(350)
-        self.chart_view.setStyleSheet("""
-            QChartView {
-                background-color: #FFF8FA;
-                border-radius: 10px;
-            }
-        """)
-        
-        # No data label (shown when empty)
-        self.no_data_label = QLabel("📊 Add exam scores to see correlation graph")
+        self.chart_view.setMinimumHeight(320)
+        self.chart_view.setStyleSheet(_cv_style)
+
+        self._bar_chart_view = QChartView(self._bar_chart)
+        self._bar_chart_view.setRenderHint(QPainter.Antialiasing)
+        self._bar_chart_view.setMinimumHeight(320)
+        self._bar_chart_view.setStyleSheet(_cv_style)
+
+        # No data label (shared across both tabs)
+        self.no_data_label = QLabel("📊 Add exam scores to see graphs")
         self.no_data_label.setAlignment(Qt.AlignCenter)
         self.no_data_label.setStyleSheet("""
-            font-size: 16px;
-            color: #8B6B7A;
-            padding: 50px;
-            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-size: 16px; color: #8B6B7A; padding: 50px;
         """)
-        self.no_data_label.setVisible(False)
-        
-        # Stack widget to show either chart or "no data" message
+
+        # ── Stacked widget: tabs or "no data" ─────────────────────────────
+        self._chart_tabs.addTab(self.chart_view, "📈 Correlation")
+        self._chart_tabs.addTab(self._bar_chart_view, "📊 By Subject")
+
         self.graph_stack = QStackedWidget()
-        self.graph_stack.addWidget(self.chart_view)
+        self.graph_stack.addWidget(self._chart_tabs)
         self.graph_stack.addWidget(self.no_data_label)
-        
+
         graph_layout.addWidget(self.graph_stack)
         graph_group.setLayout(graph_layout)
         graph_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -3436,15 +3579,46 @@ class ResultsLedger(QWidget):
         max_hours = max([d['study_hours_before_exam'] for d in valid_data])
         max_score = max([d['score'] for d in valid_data])
         min_score = min([d['score'] for d in valid_data])
-        
-        # Set ranges with padding
+
         self.axis_y_hours.setRange(0, max(max_hours * 1.2, 10))
         self.axis_y_score.setRange(max(0, min_score - 10), min(100, max_score + 10))
-        
-        # X axis: show 0 to number of exams + 1 for padding
         num_exams = len(valid_data)
         self.axis_x.setRange(0, num_exams + 1)
         self.axis_x.setTickCount(min(num_exams + 2, 10))
+
+        # ── Score trend line (linear regression) ─────────────────────────
+        self._trend_series.clear()
+        if len(valid_data) >= 2:
+            scores_vals = [float(d['score']) for d in valid_data]
+            n = len(scores_vals)
+            xs = list(range(1, n + 1))
+            mean_x = sum(xs) / n
+            mean_y = sum(scores_vals) / n
+            numer = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, scores_vals))
+            denom = sum((x - mean_x) ** 2 for x in xs) or 1
+            slope = numer / denom
+            intercept = mean_y - slope * mean_x
+            self._trend_series.append(1, intercept + slope * 1)
+            self._trend_series.append(n, intercept + slope * n)
+
+        # ── Per-subject bar chart ─────────────────────────────────────────
+        all_scores = self.db.get_exam_scores()
+        from collections import defaultdict
+        subj_scores: dict = defaultdict(list)
+        for s in all_scores:
+            if s.get('score') is not None:
+                subj_scores[s['subject_name']].append(float(s['score']))
+
+        if self._bar_set.count() > 0:
+            self._bar_set.remove(0, self._bar_set.count())
+        subjects = sorted(subj_scores.keys())
+        self._bar_axis_x.clear()
+        if subjects:
+            self._bar_axis_x.append(subjects)
+            for subj in subjects:
+                avg = sum(subj_scores[subj]) / len(subj_scores[subj])
+                self._bar_set.append(avg)
+            self._bar_axis_y.setRange(0, 100)
     
     def view_exam_details(self, row: int):
         """Open detail dialog for exam at row"""
@@ -4271,65 +4445,106 @@ class ProfilePage(QWidget):
         header.addLayout(title_layout)
         header.addStretch()
         
-        # Music file banner
+        # ── Inline Music Player ──────────────────────────────────────────────
         music_widget = QWidget()
-        music_layout = QVBoxLayout()
-        music_layout.setContentsMargins(0, 0, 0, 0)
-        
-        music_label = QLabel("🎵 Study Music")
-        music_label.setStyleSheet("""
-            font-size: 12px;
-            color: #8B6B7A;
-            font-weight: 600;
+        music_widget.setMinimumWidth(220)
+        music_widget.setMaximumWidth(260)
+        music_widget.setStyleSheet("""
+            QWidget {
+                background-color: #FFF5F7;
+                border: 2px solid #FFD1DC;
+                border-radius: 14px;
+            }
         """)
+        music_layout = QVBoxLayout(music_widget)
+        music_layout.setContentsMargins(12, 10, 12, 10)
+        music_layout.setSpacing(6)
+
+        # QMediaPlayer backend
+        self._media_player = QMediaPlayer(self)
+        self._audio_output = QAudioOutput(self)
+        self._media_player.setAudioOutput(self._audio_output)
+        self._audio_output.setVolume(0.8)
+        self._media_player.playbackStateChanged.connect(self._on_playback_state_changed)
+
+        # Header label
+        music_label = QLabel("🎵  Study Music")
+        music_label.setStyleSheet(
+            "font-size: 12px; font-weight: 700; color: #FF6B9D; background: transparent; border: none;"
+        )
         music_layout.addWidget(music_label)
-        
-        self.music_path_label = QLabel("No music selected")
-        self.music_path_label.setStyleSheet("""
-            font-size: 10px;
-            color: #999999;
-        """)
+
+        # Now-playing label
+        self.music_path_label = QLabel("No track selected")
+        self.music_path_label.setStyleSheet(
+            "font-size: 10px; color: #8B6B7A; background: transparent; border: none;"
+        )
+        self.music_path_label.setWordWrap(True)
         if self.profile_data.get('music_file'):
             self.music_path_label.setText(Path(self.profile_data['music_file']).name)
         music_layout.addWidget(self.music_path_label)
-        
-        self.select_music_btn = QPushButton("🎵 Select Music")
-        self.select_music_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #FF6B9D;
-                color: white;
-                border: none;
-                padding: 8px 15px;
-                border-radius: 8px;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                background-color: #FF8FA3;
-            }
-        """)
+
+        # Transport row: ◀ ▶/⏸ ■
+        transport = QHBoxLayout()
+        transport.setSpacing(6)
+
+        self.select_music_btn = QPushButton("📂")
+        self.select_music_btn.setFixedSize(30, 30)
+        self.select_music_btn.setToolTip("Choose a music file")
+        self.select_music_btn.setStyleSheet(self._music_btn_css())
         self.select_music_btn.clicked.connect(self.select_music_file)
-        music_layout.addWidget(self.select_music_btn)
-        
-        self.play_music_btn = QPushButton("▶ Play")
-        self.play_music_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #FFE4E8;
-                color: #8B6B7A;
-                border: 2px solid #FFD1DC;
-                padding: 6px 12px;
-                border-radius: 6px;
-                font-size: 11px;
+        transport.addWidget(self.select_music_btn)
+
+        self.play_music_btn = QPushButton("▶")
+        self.play_music_btn.setFixedSize(34, 34)
+        self.play_music_btn.setToolTip("Play / Pause")
+        self.play_music_btn.setStyleSheet(self._music_btn_css(primary=True))
+        self.play_music_btn.setEnabled(bool(self.profile_data.get('music_file')))
+        self.play_music_btn.clicked.connect(self.toggle_music)
+        transport.addWidget(self.play_music_btn)
+
+        stop_btn = QPushButton("■")
+        stop_btn.setFixedSize(30, 30)
+        stop_btn.setToolTip("Stop")
+        stop_btn.setStyleSheet(self._music_btn_css())
+        stop_btn.clicked.connect(self.stop_music)
+        transport.addWidget(stop_btn)
+
+        transport.addStretch()
+
+        # Volume slider
+        vol_icon = QLabel("🔊")
+        vol_icon.setStyleSheet("font-size: 11px; background: transparent; border: none;")
+        transport.addWidget(vol_icon)
+
+        self._vol_slider = QSlider(Qt.Horizontal)
+        self._vol_slider.setRange(0, 100)
+        self._vol_slider.setValue(80)
+        self._vol_slider.setFixedWidth(55)
+        self._vol_slider.setFixedHeight(16)
+        self._vol_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                height: 4px;
+                background: #FFD1DC;
+                border-radius: 2px;
             }
-            QPushButton:hover {
-                background-color: #FFD1DC;
+            QSlider::handle:horizontal {
+                background: #FF6B9D;
+                width: 12px; height: 12px;
+                margin: -4px 0;
+                border-radius: 6px;
+            }
+            QSlider::sub-page:horizontal {
+                background: #FF6B9D;
+                border-radius: 2px;
             }
         """)
-        self.play_music_btn.clicked.connect(self.play_music)
-        self.play_music_btn.setEnabled(bool(self.profile_data.get('music_file')))
-        music_layout.addWidget(self.play_music_btn)
-        
-        music_widget.setLayout(music_layout)
-        music_widget.setMaximumWidth(150)
+        self._vol_slider.valueChanged.connect(
+            lambda v: self._audio_output.setVolume(v / 100.0)
+        )
+        transport.addWidget(self._vol_slider)
+
+        music_layout.addLayout(transport)
         header.addWidget(music_widget)
         
         layout.addLayout(header)
@@ -4902,47 +5117,74 @@ class ProfilePage(QWidget):
             self.profile_data['profile_picture'] = file_path
             self.update_profile_picture()
     
+    # ── Music player helpers ──────────────────────────────────────────────
+
+    @staticmethod
+    def _music_btn_css(primary: bool = False) -> str:
+        if primary:
+            return """
+                QPushButton {
+                    background-color: #FF6B9D; color: white;
+                    border: none; border-radius: 8px;
+                    font-size: 14px; font-weight: 700;
+                }
+                QPushButton:hover { background-color: #FF8FA3; }
+                QPushButton:disabled { background-color: #FFD1DC; color: white; }
+            """
+        return """
+            QPushButton {
+                background-color: #FFE4E8; color: #8B6B7A;
+                border: 2px solid #FFD1DC; border-radius: 7px;
+                font-size: 13px;
+            }
+            QPushButton:hover { background-color: #FFD1DC; }
+        """
+
+    def _on_playback_state_changed(self, state):
+        if state == QMediaPlayer.PlaybackState.PlayingState:
+            self.play_music_btn.setText("⏸")
+            self.play_music_btn.setToolTip("Pause")
+        else:
+            self.play_music_btn.setText("▶")
+            self.play_music_btn.setToolTip("Play")
+
     def select_music_file(self):
         """Open file dialog to select music file"""
         from PySide6.QtWidgets import QFileDialog
-        
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select Study Music",
             str(Path.home()),
-            "Audio Files (*.mp3 *.wav *.ogg *.m4a);;All Files (*)"
+            "Audio Files (*.mp3 *.wav *.ogg *.flac *.m4a);;All Files (*)"
         )
-        
         if file_path:
             self.profile_data['music_file'] = file_path
             self.music_path_label.setText(Path(file_path).name)
             self.play_music_btn.setEnabled(True)
+            self._media_player.setSource(QUrl.fromLocalFile(file_path))
             self.save_profile()
-    
+
+    def toggle_music(self):
+        """Play or pause the current track."""
+        if not self.profile_data.get('music_file'):
+            return
+        if self._media_player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
+            self._media_player.pause()
+        else:
+            src = self._media_player.source()
+            if not src.isValid() or src.isEmpty():
+                self._media_player.setSource(
+                    QUrl.fromLocalFile(self.profile_data['music_file'])
+                )
+            self._media_player.play()
+
+    def stop_music(self):
+        """Stop playback and reset position."""
+        self._media_player.stop()
+
     def play_music(self):
-        """Play the selected music file"""
-        if self.profile_data.get('music_file') and Path(self.profile_data['music_file']).exists():
-            import subprocess
-            import platform
-            
-            music_file = self.profile_data['music_file']
-            system = platform.system()
-            
-            try:
-                if system == "Linux":
-                    subprocess.Popen(['xdg-open', music_file], 
-                                   stdout=subprocess.DEVNULL, 
-                                   stderr=subprocess.DEVNULL)
-                elif system == "Darwin":  # macOS
-                    subprocess.Popen(['open', music_file],
-                                   stdout=subprocess.DEVNULL,
-                                   stderr=subprocess.DEVNULL)
-                elif system == "Windows":
-                    subprocess.Popen(['start', music_file], shell=True,
-                                   stdout=subprocess.DEVNULL,
-                                   stderr=subprocess.DEVNULL)
-            except Exception as e:
-                QMessageBox.warning(self, "Error", f"Could not play music: {e}")
+        """Legacy alias — kept for any existing connections."""
+        self.toggle_music()
 
 
 class LibrarySection(QWidget):
