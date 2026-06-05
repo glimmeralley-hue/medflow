@@ -25,12 +25,15 @@ cp -r "$SCRIPT_DIR"/*.db "$INSTALL_DIR/" 2>/dev/null || true
 ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
 mkdir -p "$ICON_DIR"
 
-# Create a simple icon (we'll use a placeholder - user can replace it)
-echo "🎨 Creating application icon..."
-cat > "$ICON_DIR/$APP_ID.png" << 'EOF'
-# This is a placeholder - replace with actual icon
-# For now, we'll create a desktop entry without a custom icon
-EOF
+ICON_PATH="appointment-new"
+if [ -f "$SCRIPT_DIR/medflow-icon.svg" ]; then
+    echo "🎨 Installing application icon..."
+    cp "$SCRIPT_DIR/medflow-icon.svg" "$ICON_DIR/$APP_ID.svg"
+    cp "$SCRIPT_DIR/medflow-icon.svg" "$INSTALL_DIR/"
+    ICON_PATH="$INSTALL_DIR/medflow-icon.svg"
+else
+    echo "🎨 No SVG icon found; using system default icon."
+fi
 
 # Create desktop entry
 DESKTOP_DIR="$HOME/.local/share/applications"
@@ -42,7 +45,7 @@ cat > "$DESKTOP_DIR/$APP_ID.desktop" << EOF
 Name=MedFlow
 Comment=Medical School Command Center - Planner, Timer, and Study Assistant
 Exec=python3 $INSTALL_DIR/main.py
-Icon=appointment-new
+Icon=$ICON_PATH
 Type=Application
 Categories=Education;Office;Calendar;
 Terminal=false
