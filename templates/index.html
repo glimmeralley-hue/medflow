@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedFlow — Medical School Command Center</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Sidebar Navigation -->
+        <nav id="sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-icon">🩺</div>
+                <span class="logo-text">MedFlow</span>
+            </div>
+            <ul class="nav-list">
+                <li class="nav-item active" data-tab="planner" onclick="switchTab('planner')">
+                    <span class="nav-icon">📅</span>
+                    <span class="nav-label">Planner</span>
+                </li>
+                <li class="nav-item" data-tab="results" onclick="switchTab('results')">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-label">Results</span>
+                </li>
+                <li class="nav-item" data-tab="notes" onclick="switchTab('notes')">
+                    <span class="nav-icon">📝</span>
+                    <span class="nav-label">Notes</span>
+                </li>
+                <li class="nav-item" data-tab="library" onclick="switchTab('library')">
+                    <span class="nav-icon">📚</span>
+                    <span class="nav-label">Library</span>
+                </li>
+                <li class="nav-item" data-tab="profile" onclick="switchTab('profile')">
+                    <span class="nav-icon">👤</span>
+                    <span class="nav-label">Profile</span>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main id="main-content">
+
+            <!-- ===== PLANNER TAB ===== -->
+            <div id="tab-planner" class="tab-content active">
+                <div class="tab-header">
+                    <h1>📅 Medical School Planner</h1>
+                    <div class="header-actions">
+                        <div class="view-toggle">
+                            <button class="view-btn active" id="view-month" onclick="setCalendarView('month')">Month</button>
+                            <button class="view-btn" id="view-week" onclick="setCalendarView('week')">Week</button>
+                            <button class="view-btn" id="view-day" onclick="setCalendarView('day')">Day</button>
+                        </div>
+                        <button class="btn-primary" onclick="openEventModal()">➕ Add Event</button>
+                    </div>
+                </div>
+
+                <div class="planner-layout">
+                    <!-- Left: Calendar -->
+                    <div class="calendar-panel">
+                        <div class="calendar-nav">
+                            <button class="nav-btn" onclick="changeMonth(-1)">◀ Previous</button>
+                            <button class="nav-btn today-btn" onclick="goToToday()">📍 Today</button>
+                            <button class="nav-btn" onclick="changeMonth(1)">Next ▶</button>
+                            <span id="calendar-month-label" class="month-label"></span>
+                        </div>
+                        <div id="calendar-container" class="calendar-grid-wrapper">
+                            <div class="calendar-header">
+                                <div>Mon</div><div>Tue</div><div>Wed</div>
+                                <div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+                            </div>
+                            <div id="calendar-grid" class="calendar-grid"></div>
+                        </div>
+
+                        <!-- Week View -->
+                        <div id="week-view" class="week-view hidden">
+                            <div id="week-grid"></div>
+                        </div>
+
+                        <!-- Day View -->
+                        <div id="day-view" class="day-view hidden">
+                            <div id="day-schedule"></div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Details Panel -->
+                    <div class="details-panel">
+                        <div class="selected-date-label">
+                            <span id="selected-date-display">Select a date</span>
+                        </div>
+
+                        <!-- Timer Section -->
+                        <div class="card timer-card">
+                            <div class="card-title">⏱️ Focus Timer</div>
+                            <div id="timer-event-name" class="timer-event-name">No event selected</div>
+                            <div class="timer-ring-container">
+                                <canvas id="timer-ring" width="160" height="160"></canvas>
+                                <div id="timer-display" class="timer-display">25:00</div>
+                            </div>
+                            <div class="timer-controls">
+                                <button class="timer-btn start" onclick="startTimer()" title="Start">▶</button>
+                                <button class="timer-btn pause" onclick="pauseTimer()" title="Pause">⏸</button>
+                                <button class="timer-btn reset" onclick="resetTimer()" title="Reset">↺</button>
+                            </div>
+                            <div class="timer-presets">
+                                <button class="preset-btn" onclick="setTimerPreset(25)">25'</button>
+                                <button class="preset-btn" onclick="setTimerPreset(50)">50'</button>
+                            </div>
+                        </div>
+
+                        <!-- Reminders -->
+                        <div class="card reminders-card">
+                            <div class="card-title reminders-title">
+                                <span id="reminder-bell" class="bell-icon">🔔</span>
+                                Upcoming Reminders
+                                <button class="check-btn" onclick="loadReminders()">Check Now</button>
+                            </div>
+                            <div id="reminders-list" class="reminders-list">
+                                <div class="empty-state">No upcoming reminders</div>
+                            </div>
+                        </div>
+
+                        <!-- Events for Date -->
+                        <div class="card events-card">
+                            <div class="card-title">📋 Events for Selected Date</div>
+                            <div id="day-events-list" class="events-list">
+                                <div class="empty-state">Select a date to view events</div>
+                            </div>
+                        </div>
+
+                        <!-- Study Notes (shown when event selected) -->
+                        <div class="card study-notes-card" id="study-notes-panel">
+                            <div class="card-title">📝 High-Yield Facts</div>
+                            <div id="selected-event-name" class="selected-event-name">Select an event</div>
+                            <div class="facts-inputs">
+                                <input type="text" id="fact1" class="fact-input" placeholder="Key fact #1...">
+                                <input type="text" id="fact2" class="fact-input" placeholder="Key fact #2...">
+                                <input type="text" id="fact3" class="fact-input" placeholder="Key fact #3...">
+                            </div>
+                            <div class="facts-actions">
+                                <button class="btn-primary btn-sm" onclick="saveFacts()">💾 Save Facts</button>
+                                <button class="btn-danger btn-sm" onclick="addToDebt()">🚨 Add to Debt</button>
+                            </div>
+                        </div>
+
+                        <!-- Study Debt -->
+                        <div class="card debt-card">
+                            <div class="card-title">📚 Study Debt</div>
+                            <div id="debt-list" class="debt-list">
+                                <div class="empty-state">No study debt</div>
+                            </div>
+                            <button class="btn-secondary btn-sm" onclick="autoScheduleDebt()" style="margin-top:10px;">
+                                ⚡ Auto-Schedule Debt
+                            </button>
+                        </div>
+
+                        <p class="hint-text">💡 Click any event to start a focus timer. Reminders check automatically.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== RESULTS TAB ===== -->
+            <div id="tab-results" class="tab-content">
+                <div class="tab-header">
+                    <h1>📊 Results Ledger</h1>
+                </div>
+
+                <div class="results-layout">
+                    <div class="card add-exam-card">
+                        <div class="card-title">➕ Add Exam Score</div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Subject Name</label>
+                                <input type="text" id="exam-subject" placeholder="e.g., Anatomy, Physiology">
+                            </div>
+                            <div class="form-group">
+                                <label>Exam Type</label>
+                                <select id="exam-type">
+                                    <option value="CAT (Continuous Assessment Test)">CAT (Continuous Assessment Test)</option>
+                                    <option value="End-of-Unit Exam">End-of-Unit Exam</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Score (%)</label>
+                                <input type="number" id="exam-score" min="0" max="100" step="0.1" value="50">
+                            </div>
+                            <div class="form-group">
+                                <label>Date</label>
+                                <input type="date" id="exam-date">
+                            </div>
+                            <div class="form-group">
+                                <label>Study Hours (week before)</label>
+                                <input type="number" id="exam-study-hours" min="0" max="168" step="0.5" value="20">
+                            </div>
+                            <div class="form-group">
+                                <label>Notes</label>
+                                <input type="text" id="exam-notes" placeholder="Optional notes...">
+                            </div>
+                        </div>
+                        <button class="btn-primary" onclick="addExamScore()">✓ Add Score</button>
+                    </div>
+
+                    <div class="card scores-card">
+                        <div class="card-title">📋 Exam Scores</div>
+                        <div class="table-wrapper">
+                            <table id="scores-table" class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Subject</th>
+                                        <th>Exam Type</th>
+                                        <th>Score (%)</th>
+                                        <th>Date</th>
+                                        <th>Status</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="scores-tbody">
+                                    <tr><td colspan="6" class="empty-cell">No exam scores yet</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn-danger btn-sm" onclick="clearAllExams()">⚠️ Clear All Data</button>
+                        </div>
+                    </div>
+
+                    <div class="card graph-card">
+                        <div class="card-title">📈 Study Hours vs Exam Score Correlation</div>
+                        <div class="chart-container">
+                            <canvas id="correlation-chart"></canvas>
+                        </div>
+                        <p class="chart-hint">Each point = one exam. X-axis = study hours in the week before. Y-axis = score (%). Dashed line = 50% pass mark.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== NOTES TAB ===== -->
+            <div id="tab-notes" class="tab-content">
+                <div class="tab-header">
+                    <h1>📝 Study Notes</h1>
+                </div>
+
+                <div class="notes-layout">
+                    <div class="notes-sidebar">
+                        <div class="notes-search">
+                            <input type="text" id="notes-search" placeholder="🔍 Search notes..." oninput="filterNotes(this.value)">
+                        </div>
+                        <button class="btn-primary btn-full" onclick="newNote()">➕ New Note</button>
+                        <div id="notes-list" class="notes-list"></div>
+                    </div>
+
+                    <div class="notes-editor">
+                        <div class="editor-header">
+                            <input type="text" id="note-title-input" class="note-title-input" placeholder="Note title...">
+                            <select id="note-category-input" class="note-category-select">
+                                <option>General</option>
+                                <option>Anatomy</option>
+                                <option>Physiology</option>
+                                <option>Biochemistry</option>
+                                <option>Pathology</option>
+                                <option>Pharmacology</option>
+                                <option>Clinical</option>
+                                <option>High-Yield Facts</option>
+                            </select>
+                        </div>
+                        <textarea id="note-content-input" class="note-content-textarea" placeholder="Start writing your note here..."></textarea>
+                        <div class="editor-footer">
+                            <span id="word-count" class="word-count">0 words | 0 characters</span>
+                            <div class="editor-actions">
+                                <button class="btn-secondary btn-sm" onclick="deleteCurrentNote()">🗑️ Delete</button>
+                                <button class="btn-primary btn-sm" onclick="saveNote()">💾 Save Note</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== LIBRARY TAB ===== -->
+            <div id="tab-library" class="tab-content">
+                <div class="tab-header">
+                    <h1>📚 Digital Medical Library</h1>
+                    <button class="btn-primary" onclick="openAddBookModal()">➕ Add Book</button>
+                </div>
+
+                <div class="library-filters">
+                    <input type="text" id="library-search" placeholder="🔍 Search books..." oninput="searchBooks(this.value)">
+                    <div class="category-filters" id="category-filters">
+                        <button class="cat-btn active" onclick="filterByCategory('All', this)">All</button>
+                        <button class="cat-btn" onclick="filterByCategory('Anatomy', this)">Anatomy</button>
+                        <button class="cat-btn" onclick="filterByCategory('Physiology', this)">Physiology</button>
+                        <button class="cat-btn" onclick="filterByCategory('Biochemistry', this)">Biochemistry</button>
+                        <button class="cat-btn" onclick="filterByCategory('Pathology', this)">Pathology</button>
+                        <button class="cat-btn" onclick="filterByCategory('Pharmacology', this)">Pharmacology</button>
+                        <button class="cat-btn" onclick="filterByCategory('Clinical', this)">Clinical</button>
+                    </div>
+                </div>
+
+                <div id="library-grid" class="library-grid">
+                    <div class="empty-state large">No books in your library yet. Add your first textbook!</div>
+                </div>
+            </div>
+
+            <!-- ===== PROFILE TAB ===== -->
+            <div id="tab-profile" class="tab-content">
+                <div class="tab-header">
+                    <h1>👤 My Profile</h1>
+                </div>
+
+                <div class="profile-layout">
+                    <div class="profile-left">
+                        <div class="card avatar-card">
+                            <div class="avatar-circle" id="avatar-display">👩‍⚕️</div>
+                            <div id="profile-name-display" class="profile-name-display">Medical Student</div>
+                            <div id="profile-school-display" class="profile-school-display">Your School</div>
+                        </div>
+
+                        <div class="card stats-card">
+                            <div class="card-title">📈 Quick Stats</div>
+                            <div id="stats-grid" class="stats-grid"></div>
+                        </div>
+                    </div>
+
+                    <div class="profile-right">
+                        <div class="card profile-form-card">
+                            <div class="card-title">✏️ Edit Profile</div>
+                            <div class="profile-form">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Full Name</label>
+                                        <input type="text" id="profile-name" placeholder="Your name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Medical School</label>
+                                        <input type="text" id="profile-school" placeholder="Your school">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Year of Study</label>
+                                        <select id="profile-year">
+                                            <option value="">Select year</option>
+                                            <option>Year 1</option>
+                                            <option>Year 2</option>
+                                            <option>Year 3</option>
+                                            <option>Year 4</option>
+                                            <option>Year 5</option>
+                                            <option>Year 6</option>
+                                            <option>Intern</option>
+                                            <option>Resident</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Graduation Year</label>
+                                        <input type="text" id="profile-graduation" placeholder="e.g., 2027">
+                                    </div>
+                                </div>
+                                <div class="form-group full-width">
+                                    <label>Ambitions & Goals</label>
+                                    <textarea id="profile-ambitions" placeholder="What do you aspire to achieve?"></textarea>
+                                </div>
+                                <div class="form-group full-width">
+                                    <label>Specialties of Interest</label>
+                                    <input type="text" id="profile-specialties" placeholder="e.g., Surgery, Paediatrics, Internal Medicine">
+                                </div>
+                                <div class="form-group full-width">
+                                    <label>Hobbies & Interests</label>
+                                    <input type="text" id="profile-hobbies" placeholder="What do you enjoy outside medicine?">
+                                </div>
+                                <div class="form-group full-width">
+                                    <label>Study Plan</label>
+                                    <textarea id="profile-study-plan" placeholder="Your study strategy and goals..."></textarea>
+                                </div>
+                                <div class="form-group full-width">
+                                    <label>Motivation & Mantra</label>
+                                    <textarea id="profile-motivation" placeholder="What keeps you going?"></textarea>
+                                </div>
+                                <div class="profile-actions">
+                                    <button class="btn-danger" onclick="clearAllData()">🗑️ Clear All Data</button>
+                                    <button class="btn-primary" onclick="saveProfile()">💾 Save Profile</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ===== ADD EVENT MODAL ===== -->
+    <div id="event-modal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeEventModal()"></div>
+        <div class="modal-box">
+            <div class="modal-header">
+                <h2>➕ Add New Event</h2>
+                <button class="modal-close" onclick="closeEventModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Event Title *</label>
+                    <input type="text" id="modal-title" placeholder="e.g., Anatomy Lecture">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="modal-category">
+                            <option>Lecture</option>
+                            <option>Practical Lab</option>
+                            <option>Dissection</option>
+                            <option>Clinical Rotation</option>
+                            <option>Study Session</option>
+                            <option>Exam</option>
+                            <option>Tutorial</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Subtopic</label>
+                        <input type="text" id="modal-subtopic" placeholder="e.g., Lower Limb">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" id="modal-date">
+                    </div>
+                    <div class="form-group">
+                        <label>Start Time</label>
+                        <input type="time" id="modal-time-start" value="09:00">
+                    </div>
+                    <div class="form-group">
+                        <label>End Time</label>
+                        <input type="time" id="modal-time-end" value="10:00">
+                    </div>
+                </div>
+                <div class="form-row reminder-row">
+                    <div class="form-group">
+                        <label>Reminder</label>
+                        <div class="reminder-controls">
+                            <input type="checkbox" id="modal-reminder-enabled" checked>
+                            <input type="number" id="modal-reminder-minutes" value="15" min="5" max="120">
+                            <span>minutes before</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea id="modal-notes" placeholder="Additional details, room number, preparation needed..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeEventModal()">✕ Cancel</button>
+                <button class="btn-primary" onclick="saveEvent()">✓ Save Event</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== ADD BOOK MODAL ===== -->
+    <div id="book-modal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeBookModal()"></div>
+        <div class="modal-box">
+            <div class="modal-header">
+                <h2>📚 Add Book to Library</h2>
+                <button class="modal-close" onclick="closeBookModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Book Title *</label>
+                    <input type="text" id="book-title" placeholder="e.g., Gray's Anatomy">
+                </div>
+                <div class="form-group">
+                    <label>Author</label>
+                    <input type="text" id="book-author" placeholder="e.g., Henry Gray">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="book-category">
+                            <option>Anatomy</option>
+                            <option>Physiology</option>
+                            <option>Biochemistry</option>
+                            <option>Pathology</option>
+                            <option>Pharmacology</option>
+                            <option>Clinical</option>
+                            <option>General</option>
+                            <option>Custom</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Custom Category</label>
+                        <input type="text" id="book-custom-category" placeholder="Only if 'Custom' selected">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="book-description" placeholder="Brief description of the book..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Total Pages</label>
+                    <input type="number" id="book-pages" min="0" value="0">
+                </div>
+                <div class="form-group">
+                    <label>File Reference / URL</label>
+                    <input type="text" id="book-file-path" placeholder="Path or URL to file (optional)">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeBookModal()">✕ Cancel</button>
+                <button class="btn-primary" onclick="saveBook()">💾 Save Book</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== TOAST NOTIFICATION ===== -->
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
