@@ -1,4 +1,4 @@
-# MedFlow - Native Medical School Command Center
+# medflow
 
 A lightweight, native desktop application designed specifically for medical students, featuring a high-yield planner and scheduler with a professional dark theme aesthetic.
 
