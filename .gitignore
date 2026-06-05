@@ -32,5 +32,8 @@ ENV/
 # Local app data
 .local/
 
+dist/
+build/
+
 # Editor backup directories
 .windsurf/

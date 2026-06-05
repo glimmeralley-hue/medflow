@@ -200,9 +200,16 @@ class Database:
                     motivation TEXT,
                     profile_picture_path TEXT,
                     music_file_path TEXT,
+                    music_folder_path TEXT,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            # Migration: Add music folder field to user_profile if missing
+            try:
+                cursor.execute("SELECT music_folder_path FROM user_profile LIMIT 1")
+            except sqlite3.OperationalError:
+                cursor.execute("ALTER TABLE user_profile ADD COLUMN music_folder_path TEXT")
             
             # Library books table
             cursor.execute("""
@@ -428,7 +435,8 @@ class Database:
                     profile_data.get('study_plan', ''),
                     profile_data.get('motivation', ''),
                     profile_data.get('profile_picture', ''),
-                    profile_data.get('music_file', '')
+                    profile_data.get('music_file', ''),
+                    profile_data.get('music_folder', '')
                 ))
                 conn.commit()
                 return True
@@ -4305,8 +4313,12 @@ class ProfilePage(QWidget):
         super().__init__()
         self.db = database
         self.profile_data = {}
+        self.music_playlist = []
+        self.current_track_index = 0
         self.load_profile()
         self.init_ui()
+        if self.profile_data.get('music_folder'):
+            self._load_music_folder(self.profile_data['music_folder'])
         self.populate_profile_fields()
         self.load_dashboard_data()
     
@@ -4323,7 +4335,8 @@ class ProfilePage(QWidget):
             'study_plan': '',
             'motivation': '',
             'profile_picture': '',
-            'music_file': ''
+            'music_file': '',
+            'music_folder': ''
         }
 
         if self.db:
@@ -4340,7 +4353,8 @@ class ProfilePage(QWidget):
                     'study_plan': db_profile.get('study_plan') or '',
                     'motivation': db_profile.get('motivation') or '',
                     'profile_picture': db_profile.get('profile_picture_path') or '',
-                    'music_file': db_profile.get('music_file_path') or ''
+                    'music_file': db_profile.get('music_file_path') or '',
+                    'music_folder': db_profile.get('music_folder_path') or ''
                 }
                 return
 
@@ -4466,6 +4480,7 @@ class ProfilePage(QWidget):
         self._media_player.setAudioOutput(self._audio_output)
         self._audio_output.setVolume(0.8)
         self._media_player.playbackStateChanged.connect(self._on_playback_state_changed)
+        self._media_player.mediaStatusChanged.connect(self._on_media_status_changed)
 
         # Header label
         music_label = QLabel("🎵  Study Music")
@@ -4480,13 +4495,23 @@ class ProfilePage(QWidget):
             "font-size: 10px; color: #8B6B7A; background: transparent; border: none;"
         )
         self.music_path_label.setWordWrap(True)
-        if self.profile_data.get('music_file'):
-            self.music_path_label.setText(Path(self.profile_data['music_file']).name)
+        self.music_path_label = QLabel(self._get_music_label_text())
+        self.music_path_label.setStyleSheet(
+            "font-size: 10px; color: #8B6B7A; background: transparent; border: none;"
+        )
+        self.music_path_label.setWordWrap(True)
         music_layout.addWidget(self.music_path_label)
 
-        # Transport row: ◀ ▶/⏸ ■
+        # Transport row: folder/file select, play/pause, stop
         transport = QHBoxLayout()
         transport.setSpacing(6)
+
+        self.select_music_folder_btn = QPushButton("📁")
+        self.select_music_folder_btn.setFixedSize(30, 30)
+        self.select_music_folder_btn.setToolTip("Choose a music folder")
+        self.select_music_folder_btn.setStyleSheet(self._music_btn_css())
+        self.select_music_folder_btn.clicked.connect(self.select_music_folder)
+        transport.addWidget(self.select_music_folder_btn)
 
         self.select_music_btn = QPushButton("📂")
         self.select_music_btn.setFixedSize(30, 30)
@@ -4499,7 +4524,7 @@ class ProfilePage(QWidget):
         self.play_music_btn.setFixedSize(34, 34)
         self.play_music_btn.setToolTip("Play / Pause")
         self.play_music_btn.setStyleSheet(self._music_btn_css(primary=True))
-        self.play_music_btn.setEnabled(bool(self.profile_data.get('music_file')))
+        self.play_music_btn.setEnabled(bool(self.profile_data.get('music_file') or self.music_playlist))
         self.play_music_btn.clicked.connect(self.toggle_music)
         transport.addWidget(self.play_music_btn)
 
@@ -4906,8 +4931,8 @@ class ProfilePage(QWidget):
         self.hobbies_input.setText(self.profile_data.get('hobbies', ''))
         self.study_plan_input.setText(self.profile_data.get('study_plan', ''))
         self.motivation_input.setText(self.profile_data.get('motivation', ''))
-        self.music_path_label.setText(Path(self.profile_data.get('music_file', '')).name if self.profile_data.get('music_file') else "No music selected")
-        self.play_music_btn.setEnabled(bool(self.profile_data.get('music_file')))
+        self.music_path_label.setText(self._get_music_label_text())
+        self.play_music_btn.setEnabled(bool(self.profile_data.get('music_file') or self.music_playlist))
         self.update_profile_picture()
 
     def update_quick_stats(self):
@@ -5148,6 +5173,54 @@ class ProfilePage(QWidget):
             self.play_music_btn.setText("▶")
             self.play_music_btn.setToolTip("Play")
 
+    def _on_media_status_changed(self, status):
+        if status == QMediaPlayer.MediaStatus.EndOfMedia:
+            self._play_next_track()
+
+    def _get_music_label_text(self) -> str:
+        folder = self.profile_data.get('music_folder', '')
+        if folder:
+            track_count = len(self.music_playlist)
+            if track_count:
+                current_name = Path(self.music_playlist[self.current_track_index]).name
+                return f"{Path(folder).name} • {self.current_track_index + 1}/{track_count} {current_name}"
+            return f"{Path(folder).name} • 0 tracks found"
+        if self.profile_data.get('music_file'):
+            return Path(self.profile_data['music_file']).name
+        return "No music selected"
+
+    def _set_current_track(self, file_path: str):
+        if not file_path:
+            return
+        self.profile_data['music_file'] = file_path
+        self.music_path_label.setText(self._get_music_label_text())
+        self._media_player.setSource(QUrl.fromLocalFile(file_path))
+
+    def _load_music_folder(self, folder_path: str):
+        self.music_playlist = []
+        self.current_track_index = 0
+        if not folder_path:
+            return
+        folder = Path(folder_path)
+        if not folder.exists() or not folder.is_dir():
+            return
+        audio_patterns = ['*.mp3', '*.wav', '*.ogg', '*.flac', '*.m4a']
+        tracks = []
+        for pattern in audio_patterns:
+            tracks.extend(folder.rglob(pattern))
+        tracks = [p for p in tracks if p.is_file()]
+        tracks = sorted(tracks, key=lambda p: p.name.lower())
+        self.music_playlist = [str(p) for p in tracks]
+        if self.music_playlist:
+            self._set_current_track(self.music_playlist[0])
+
+    def _play_next_track(self):
+        if not self.music_playlist:
+            return
+        self.current_track_index = (self.current_track_index + 1) % len(self.music_playlist)
+        self._set_current_track(self.music_playlist[self.current_track_index])
+        self._media_player.play()
+
     def select_music_file(self):
         """Open file dialog to select music file"""
         from PySide6.QtWidgets import QFileDialog
@@ -5158,24 +5231,44 @@ class ProfilePage(QWidget):
             "Audio Files (*.mp3 *.wav *.ogg *.flac *.m4a);;All Files (*)"
         )
         if file_path:
+            self.profile_data['music_folder'] = ''
+            self.music_playlist = []
+            self.current_track_index = 0
             self.profile_data['music_file'] = file_path
-            self.music_path_label.setText(Path(file_path).name)
+            self._set_current_track(file_path)
             self.play_music_btn.setEnabled(True)
-            self._media_player.setSource(QUrl.fromLocalFile(file_path))
+            self.save_profile()
+
+    def select_music_folder(self):
+        """Open folder dialog to select a music folder"""
+        from PySide6.QtWidgets import QFileDialog
+        folder_path = QFileDialog.getExistingDirectory(
+            self,
+            "Select Study Music Folder",
+            str(Path.home())
+        )
+        if folder_path:
+            self.profile_data['music_folder'] = folder_path
+            self._load_music_folder(folder_path)
+            self.play_music_btn.setEnabled(bool(self.music_playlist))
+            self.music_path_label.setText(self._get_music_label_text())
+            if not self.music_playlist:
+                QMessageBox.information(self, "No audio found", "No supported audio tracks were found in that folder.")
             self.save_profile()
 
     def toggle_music(self):
         """Play or pause the current track."""
-        if not self.profile_data.get('music_file'):
+        if not self.profile_data.get('music_file') and not self.music_playlist:
             return
         if self._media_player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
             self._media_player.pause()
         else:
             src = self._media_player.source()
             if not src.isValid() or src.isEmpty():
-                self._media_player.setSource(
-                    QUrl.fromLocalFile(self.profile_data['music_file'])
-                )
+                if self.music_playlist:
+                    self._set_current_track(self.music_playlist[self.current_track_index])
+                else:
+                    self._set_current_track(self.profile_data['music_file'])
             self._media_player.play()
 
     def stop_music(self):

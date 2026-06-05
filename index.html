@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MedFlow — Study Planner for Medical Students</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #060b16;
+      --panel: rgba(14, 21, 37, 0.95);
+      --panel-strong: #0f1731;
+      --accent: #52d2ff;
+      --accent-strong: #2997f4;
+      --text: #f5f8ff;
+      --muted: #8fa3c1;
+      --border: rgba(82, 210, 255, 0.14);
+      --shadow: 0 20px 80px rgba(0, 0, 0, 0.28);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(circle at top right, rgba(82,210,255,0.16), transparent 25%),
+                  radial-gradient(circle at 20% 20%, rgba(88, 184, 255, 0.12), transparent 18%),
+                  linear-gradient(180deg, #07101f 0%, #070b15 38%, #02050a 100%);
+      color: var(--text);
+    }
+
+    .page {
+      width: min(1200px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 40px 0 80px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+      gap: 28px;
+      align-items: center;
+      margin-bottom: 36px;
+    }
+
+    .hero-copy {
+      max-width: 620px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 18px;
+      font-size: 0.94rem;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+    }
+
+    .hero-copy h1 {
+      margin: 0;
+      font-size: clamp(3rem, 4vw, 4.8rem);
+      line-height: 0.95;
+      letter-spacing: -0.04em;
+    }
+
+    .hero-copy p {
+      margin: 24px 0 28px;
+      max-width: 640px;
+      line-height: 1.8;
+      color: var(--muted);
+      font-size: 1.05rem;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .button {
+      border: none;
+      border-radius: 999px;
+      padding: 16px 26px;
+      font-size: 1rem;
+      font-weight: 700;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+      cursor: pointer;
+    }
+
+    .button.primary {
+      background: linear-gradient(135deg, var(--accent), #32b0ff);
+      color: #04111f;
+      box-shadow: 0 18px 40px rgba(82, 210, 255, 0.22);
+    }
+
+    .button.secondary {
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .button:hover { transform: translateY(-1px); }
+
+    .hero-preview {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      padding: 28px;
+    }
+
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 1.25rem;
+      color: #e0f5ff;
+    }
+
+    .card ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 12px;
+      color: var(--muted);
+      line-height: 1.75;
+    }
+
+    .card li {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+
+    .card li::before {
+      content: '•';
+      color: var(--accent);
+      font-size: 1.2rem;
+      line-height: 1;
+      margin-top: 0.15rem;
+    }
+
+    .note {
+      margin-top: 26px;
+      padding: 18px 22px;
+      background: rgba(82, 210, 255, 0.08);
+      border: 1px solid rgba(82, 210, 255, 0.14);
+      border-radius: 18px;
+      color: #d7eefc;
+      font-size: 0.96rem;
+      line-height: 1.7;
+    }
+
+    .footer {
+      margin-top: 44px;
+      color: var(--muted);
+      font-size: 0.96rem;
+      text-align: center;
+    }
+
+    @media (max-width: 900px) {
+      .hero { grid-template-columns: 1fr; }
+      .hero-copy { margin-bottom: 16px; }
+    }
+
+    @media (max-width: 640px) {
+      .page { padding: 28px 16px 60px; }
+      .button { width: 100%; }
+      .actions { flex-direction: column; align-items: stretch; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="eyebrow">MedFlow</div>
+        <h1>The study planner built for medical success.</h1>
+        <p>Organize lectures, labs, rotations and notes with a polished dark UI. Share this page for one-click access, then close the sale with a paywall purchase button.</p>
+        <div class="actions">
+          <a class="button primary" href="https://github.com/glimmeralley-hue/medflow/releases/latest" target="_blank" rel="noreferrer">Download Latest Release</a>
+          <a class="button secondary" href="https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=glimmeralley%40gmail.com&amount=5&currency_code=USD&item_name=MedFlow+License&return=https%3A%2F%2Fglimmeralley-hue.github.io%2Fmedflow%2F&cancel_return=https%3A%2F%2Fglimmeralley-hue.github.io%2Fmedflow%2F" target="_blank" rel="noreferrer">Buy License — $5</a>
+          <a class="button secondary" href="https://github.com/glimmeralley-hue/medflow" target="_blank" rel="noreferrer">Project on GitHub</a>
+        </div>
+        <div class="note">
+          <strong>Important:</strong> The current published build is a Linux AppImage. Windows support is available once the app is packaged as a native Windows executable. The source is cross-platform and a real `.exe` can be built on Windows or with Wine + Windows Python.
+          PayPal can accept your linked KCB debit MasterCard when buyers use the checkout link.
+        </div>
+      </div>
+
+      <div class="hero-preview card">
+        <h2>Launch-ready workflow</h2>
+        <ul>
+          <li>Sell access with a paywall checkout before download</li>
+          <li>Use GitHub Releases to host build assets securely</li>
+          <li>Keep Linux AppImage and Windows EXE separate and labeled</li>
+          <li>Offer one-click download links from your bio page</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 id="purchase">Purchase & delivery</h2>
+      <p>Buy access using PayPal and then send the buyer the download link. This page is configured for a clean $5 purchase flow with your email attached.</p>
+      <ul>
+        <li>Payment goes to <strong>glimmeralley@gmail.com</strong></li>
+        <li>Amount: <strong>$5 USD</strong></li>
+        <li>After purchase, buyers can visit your GitHub release page for the AppImage</li>
+        <li>Windows buyers will receive a native `.exe` once it is built</li>
+      </ul>
+      <p class="note">Tip: set PayPal to return buyers to this hosted page after checkout so they can see your download instructions.</p>
+    </section>
+
+    <div class="footer">
+      Use this file as your bio target URL on Instagram, TikTok, Twitter, or any profile link service. Enable GitHub Pages for the repo and share the live URL when ready.
+    </div>
+  </div>
+</body>
+</html>

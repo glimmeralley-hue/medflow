@@ -70,6 +70,29 @@ python3 -c "import PySide6; print('PySide6 installed successfully')"
    ```
 4. The application will start with a fully custom, tabbed interface in our Obsidian Dark Theme layout.
 
+Build helpers are available in `build_linux.sh` and `build_windows.sh`. See `BUILDING.md` for packaging instructions.
+
+## Download Page
+
+A polished landing page is available at `index.html`. Use it as your bio link or deploy it as a GitHub Pages site for a clean download experience.
+
+- Linux AppImage: `dist/MedFlow.AppImage`
+- Windows executable: `dist/MedFlow.exe` (after build on Windows)
+
+> The current published artifact is Linux-only. A real Windows `.exe` requires packaging on Windows or with Wine and a Windows Python runtime.
+## Publish on GitHub Pages
+
+1. Push your repo to GitHub.
+2. Enable GitHub Pages in repository settings.
+3. Use the `main` branch and `/` root path.
+4. Your bio link can be:
+   - `https://glimmeralley-hue.github.io/medflow/`
+
+This repo now includes a GitHub Pages workflow to deploy the page automatically from `main`.
+To publish, upload these files as release assets and share the release or hosted page URL.
+
+> Note: a real Windows `.exe` must be built on Windows or with Wine plus a Windows Python runtime. The current Linux environment cannot generate a true Windows executable.
+
 ## Application Layout
 
 ### 📅 Planner Tab
