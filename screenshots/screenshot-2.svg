@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="480" viewBox="0 0 720 480">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0c1124"/>
+      <stop offset="100%" stop-color="#091025"/>
+    </linearGradient>
+  </defs>
+  <rect width="720" height="480" rx="28" fill="url(#bg2)"/>
+  <rect x="20" y="20" width="680" height="48" rx="16" fill="#13203f"/>
+  <circle cx="54" cy="44" r="8" fill="#f06565"/>
+  <circle cx="80" cy="44" r="8" fill="#f6c74f"/>
+  <circle cx="106" cy="44" r="8" fill="#62d2ff"/>
+  <text x="40" y="104" fill="#e5f5ff" font-family="Inter, Helvetica, Arial, sans-serif" font-size="32" font-weight="700">Task & note details</text>
+  <rect x="40" y="150" width="640" height="280" rx="24" fill="#0f1731" stroke="#52d2ff33" stroke-width="1.5"/>
+  <rect x="60" y="180" width="220" height="30" rx="14" fill="#1d2e55"/>
+  <rect x="60" y="234" width="140" height="24" rx="12" fill="#224c7a"/>
+  <rect x="60" y="270" width="560" height="22" rx="11" fill="#1f3165"/>
+  <rect x="60" y="304" width="520" height="22" rx="11" fill="#1f3165"/>
+  <rect x="60" y="338" width="480" height="22" rx="11" fill="#1f3165"/>
+  <rect x="60" y="372" width="240" height="22" rx="11" fill="#1f3165"/>
+  <rect x="62" y="194" width="84" height="14" rx="7" fill="#52d2ff"/>
+  <rect x="66" y="248" width="60" height="12" rx="6" fill="#8fd8ff"/>
+  <rect x="66" y="282" width="82" height="12" rx="6" fill="#8fd8ff"/>
+  <rect x="66" y="316" width="100" height="12" rx="6" fill="#8fd8ff"/>
+  <rect x="66" y="350" width="52" height="12" rx="6" fill="#8fd8ff"/>
+  <text x="60" y="438" fill="#8fa3c1" font-size="16">Study notes, deadlines, and progress all in one planner.</text>
+</svg>

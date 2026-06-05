@@ -114,6 +114,34 @@
       gap: 18px;
     }
 
+    .screenshot-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .screenshot-grid figure {
+      margin: 0;
+      border-radius: 22px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(82, 210, 255, 0.12);
+    }
+
+    .screenshot-grid img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .screenshot-grid figcaption {
+      padding: 14px 16px;
+      font-size: 0.95rem;
+      color: var(--muted);
+      background: rgba(255,255,255,0.02);
+    }
+
     .card {
       background: var(--panel);
       border: 1px solid var(--border);
@@ -187,42 +215,39 @@
     <section class="hero">
       <div class="hero-copy">
         <div class="eyebrow">MedFlow</div>
-        <h1>The study planner built for medical success.</h1>
-        <p>Organize lectures, labs, rotations and notes with a polished dark UI. Share this page for one-click access, then close the sale with a paywall purchase button.</p>
+        <h1>Study planner for medical students.</h1>
+        <p>Plan lectures, labs, rotations and study sessions with a focused desktop app. Buy access and download the Linux AppImage from this page.</p>
         <div class="actions">
           <a class="button primary" href="https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=glimmeralley%40gmail.com&amount=5&currency_code=USD&item_name=MedFlow+License&return=https%3A%2F%2Fglimmeralley-hue.github.io%2Fmedflow%2F&cancel_return=https%3A%2F%2Fglimmeralley-hue.github.io%2Fmedflow%2F" target="_blank" rel="noreferrer">Buy License — $5</a>
+          <a class="button secondary" href="dist/MedFlow.AppImage" target="_blank" rel="noreferrer">Download AppImage</a>
         </div>
         <div class="note">
-          <strong>Important:</strong> The current published build is a Linux AppImage. Windows support is available once the app is packaged as a native Windows executable. The source is cross-platform and a real `.exe` can be built on Windows or with Wine + Windows Python.
-          PayPal can accept your linked KCB debit MasterCard when buyers use the checkout link.
+          Pay with PayPal, then download the AppImage file directly from the link above. This page is now only for purchasing and downloading the planner app.
         </div>
       </div>
 
       <div class="hero-preview card">
-        <h2>Launch-ready workflow</h2>
-        <ul>
-          <li>Sell access with a paywall checkout before download</li>
-          <li>Deliver the AppImage file directly after purchase</li>
-          <li>Keep Linux AppImage and Windows EXE separate and labeled</li>
-          <li>Offer one-click access from your bio page</li>
-        </ul>
+        <h2>See the app in action</h2>
+        <p>Preview MedFlow with planner cards, task tracking, and note workflows before you buy.</p>
+        <div class="screenshot-grid">
+          <figure>
+            <img src="screenshots/screenshot-1.svg" alt="MedFlow weekly study board screenshot" />
+            <figcaption>Weekly study board and schedule overview.</figcaption>
+          </figure>
+          <figure>
+            <img src="screenshots/screenshot-2.svg" alt="MedFlow task and note view screenshot" />
+            <figcaption>Task list, notes, and deadline tracking.</figcaption>
+          </figure>
+          <figure>
+            <img src="screenshots/screenshot-3.svg" alt="MedFlow planner screenshot" />
+            <figcaption>Focused planner layout for exams and rotations.</figcaption>
+          </figure>
+        </div>
       </div>
     </section>
 
-    <section class="card">
-      <h2 id="purchase">Purchase & delivery</h2>
-      <p>Buy access using PayPal and then send the buyer the download link. This page is configured for a clean $5 purchase flow with your email attached.</p>
-      <ul>
-        <li>Payment goes to <strong>glimmeralley@gmail.com</strong></li>
-        <li>Amount: <strong>$5 USD</strong></li>
-        <li>After purchase, deliver the AppImage directly to buyers</li>
-        <li>Windows buyers will receive a native `.exe` once it is built</li>
-      </ul>
-      <p class="note">Tip: set PayPal to return buyers to this hosted page after checkout so they can see your download instructions.</p>
-    </section>
-
     <div class="footer">
-      Use this file as your bio target URL on Instagram, TikTok, Twitter, or any profile link service. This page is the delivery landing page for buyers, so they do not need to visit your GitHub repo.
+      Direct AppImage delivery is handled here — no extra GitHub repo browsing needed.
     </div>
   </div>
 </body>
