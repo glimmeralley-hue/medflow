@@ -72,26 +72,24 @@ class FlashcardImporter:
                     conn = sqlite3.connect(str(anki_db_path))
                     cursor = conn.cursor()
                     
-                    # Try to get notes (front/back from fields)
+                    # Anki stores notes with field content in 'flds' column
+                    # The 'flds' contains all fields separated by \x1f (ASCII unit separator)
                     try:
-                        # Anki stores notes with field content
-                        cursor.execute("SELECT sfld, mflds FROM notes LIMIT 1")
-                        # Check if it's the new format
-                        columns = [desc[0] for desc in cursor.description]
-                        
                         cursor.execute("SELECT flds FROM notes")
-                        for row in cursor.fetchall():
-                            fields = row[0].split('\x1f')  # Anki field separator
-                            if len(fields) >= 2:
-                                front = fields[0].strip()
-                                back = fields[1].strip()
-                                db.add_flashcard(deck_id, front, back)
-                                count += 1
+                        all_rows = cursor.fetchall()
                     except Exception:
-                        # Try alternative table structure
-                        cursor.execute("SELECT front, back FROM cards")
-                        for row in cursor.fetchall():
-                            front, back = row[0], row[1]
+                        # Fallback: list available tables/columns for debugging
+                        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                        tables = cursor.fetchall()
+                        raise ValueError(f"Could not find notes content. Available tables: {[t[0] for t in tables]}")
+                    
+                    for row in all_rows:
+                        if row[0] is None:
+                            continue
+                        fields = row[0].split('\x1f')  # Anki field separator
+                        if len(fields) >= 2:
+                            front = fields[0].strip()
+                            back = fields[1].strip()
                             if front and back:
                                 db.add_flashcard(deck_id, front, back)
                                 count += 1
@@ -119,6 +117,7 @@ class FlashcardImporter:
             # Try Q/A format
             lines = content.split('\n')
             front = None
+            back = None
             for line in lines:
                 line = line.strip()
                 if line.startswith('Q:') or line.startswith('Question:'):
