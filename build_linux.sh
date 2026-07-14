@@ -27,6 +27,7 @@ PYINSTALLER_OPTS=(
   --name MedFlow
   --add-data "medflow-icon.svg:./"
   --add-data "requirements.txt:./"
+  --add-data "sounds:sounds"
   main.py
 )
 
@@ -50,6 +51,12 @@ Type=Application
 Categories=Education;Office;Calendar;
 Terminal=false
 EOF
+  cat > build/MedFlow.AppDir/AppRun <<'EOF'
+#!/bin/sh
+HERE="$(dirname "$(readlink -f "$0")")"
+exec "$HERE/usr/bin/MedFlow" "$@"
+EOF
+  chmod +x build/MedFlow.AppDir/AppRun
   appimagetool build/MedFlow.AppDir dist/MedFlow.AppImage
   echo "✅ AppImage created at dist/MedFlow.AppImage"
 else

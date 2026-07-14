@@ -853,8 +853,30 @@ class ThemeManager:
                 color: {sc['text']};
             }}
             QPushButton:hover {{ 
-                background: {sc['bg']}88; 
+                background: {sc['bg']}22; 
                 border-radius: 6px; 
+            }}
+        """
+    
+    def get_checkable_button_style(self, theme_type: ThemeType = None) -> str:
+        """Get stylesheet for checkable buttons (like view toggle buttons)."""
+        c = self.get_colors(theme_type or self._current_theme)
+        return f"""
+            QPushButton {{
+                background-color: {c['TAB_BG']};
+                color: {c['TAB_TEXT']};
+                border: 2px solid {c['BORDER']};
+                padding: 10px 20px;
+                font-weight: 600;
+                border-radius: 10px;
+                font-size: 14px;
+            }}
+            QPushButton:checked {{
+                background-color: {c['TAB_SELECTED']};
+                color: {c['TAB_TEXT_SELECTED']};
+            }}
+            QPushButton:hover {{
+                background-color: {c['HOVER']};
             }}
         """
 

@@ -27,7 +27,7 @@ if [[ "$OSTYPE" == cygwin* || "$OSTYPE" == msys* || "$OSTYPE" == win32 ]]; then
   DATA_SEP=";"
 fi
 
-"$PYTHON" -m PyInstaller --onefile --windowed --name MedFlow.exe --add-data "medflow-icon.svg${DATA_SEP}." --add-data "requirements.txt${DATA_SEP}." main.py
+"$PYTHON" -m PyInstaller --onefile --windowed --name MedFlow.exe --add-data "medflow-icon.svg${DATA_SEP}." --add-data "requirements.txt${DATA_SEP}." --add-data "sounds${DATA_SEP}sounds" main.py
 
 echo "✅ Build complete."
 echo "Executable is available in dist/MedFlow.exe"

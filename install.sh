@@ -21,6 +21,18 @@ echo "📦 Copying application files..."
 cp "$SCRIPT_DIR/main.py" "$INSTALL_DIR/"
 cp "$SCRIPT_DIR/requirements.txt" "$INSTALL_DIR/" 2>/dev/null || true
 
+# Copy medflow package if it exists
+if [ -d "$SCRIPT_DIR/medflow" ]; then
+    cp -r "$SCRIPT_DIR/medflow" "$INSTALL_DIR/"
+    echo "📂 Copied medflow package"
+fi
+
+# Copy sounds directory if it exists
+if [ -d "$SCRIPT_DIR/sounds" ]; then
+    cp -r "$SCRIPT_DIR/sounds" "$INSTALL_DIR/"
+    echo "🔊 Copied sounds directory"
+fi
+
 # Copy icon if it exists
 if [ -f "$SCRIPT_DIR/medflow-icon.svg" ]; then
     cp "$SCRIPT_DIR/medflow-icon.svg" "$INSTALL_DIR/"
@@ -50,11 +62,11 @@ EOF
 LAUNCHER_DIR="$HOME/.local/bin"
 mkdir -p "$LAUNCHER_DIR"
 
-cat > "$LAUNCHER_DIR/medflow" << EOF
+cat > "$LAUNCHER_DIR/medflow" << 'EOF'
 #!/bin/bash
 # MedFlow launcher
-python3 "$INSTALL_DIR/main.py" "\$@"
 EOF
+echo "python3 $INSTALL_DIR/main.py \"\$@\"" >> "$LAUNCHER_DIR/medflow"
 
 chmod +x "$LAUNCHER_DIR/medflow"
 

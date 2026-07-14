@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=MedFlow
+Exec=MedFlow
+Icon=MedFlow
+Type=Application
+Categories=Education;Office;Calendar;
+Terminal=false
