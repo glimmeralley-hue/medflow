@@ -18,6 +18,7 @@ from .library import LibrarySection
 from .flashcard_widget import FlashcardWidget
 from .flashcard_importer import FlashcardImporter
 from .main_window import MedFlowMainWindow
+from .streak_heatmap import StreakHeatmap
 
 __all__ = [
     'CATEGORY_COLORS', 'TIMER_PRESETS', 'EVENT_CATEGORIES',
@@ -34,5 +35,6 @@ __all__ = [
     'ProfilePage',
     'LibrarySection',
     'FlashcardWidget',
+    'StreakHeatmap',
     'MedFlowMainWindow',
 ]
