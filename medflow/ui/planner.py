@@ -11,6 +11,7 @@ from PySide6.QtGui import QColor
 from medflow.database import Database
 from .constants import CATEGORY_COLORS
 from .theme_manager import get_theme_manager, ThemeColors, IOS_FONT_STACK
+from .streak_heatmap import StreakHeatmap
 
 
 class FullPageSchedulePlanner(QWidget):
@@ -33,6 +34,8 @@ class FullPageSchedulePlanner(QWidget):
         """Update styles when theme changes."""
         self._colors = self.theme_manager.get_colors(theme_type)
         self._apply_theme_styles()
+        if hasattr(self, 'streak_heatmap'):
+            self.streak_heatmap.refresh()
     
     def _apply_theme_styles(self):
         """Apply theme-aware styles to all widgets."""
@@ -526,6 +529,31 @@ class FullPageSchedulePlanner(QWidget):
         events_layout.addWidget(self.events_list)
         events_group.setLayout(events_layout)
         details_layout.addWidget(events_group)
+        
+        # Study Streak Heatmap
+        streak_group = QGroupBox("Study Activity")
+        streak_group.setStyleSheet(f"""
+            QGroupBox {{
+                font-size: 14px;
+                font-weight: 600;
+                padding-top: 10px;
+                border: 2px solid {c['BORDER']};
+                border-radius: 12px;
+                margin-top: 5px;
+                font-family: {IOS_FONT_STACK};
+                color: {c['TEXT_PRIMARY']};
+            }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px;
+            }}
+        """)
+        streak_layout = QVBoxLayout()
+        self.streak_heatmap = StreakHeatmap(self.db)
+        streak_layout.addWidget(self.streak_heatmap)
+        streak_group.setLayout(streak_layout)
+        details_layout.addWidget(streak_group)
         
         # Quick stats
         stats_label = QLabel("Click any event to start a focus timer for that session. You'll get reminders before events start.")
