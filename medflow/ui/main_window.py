@@ -19,9 +19,6 @@ from .notes import NotesSection
 from .flashcard_widget import FlashcardWidget
 from .library import LibrarySection
 from .profile import ProfilePage
-from .timer import PulseTimer
-from .academic_ledger import AcademicLedger
-from .active_recall import ActiveRecallSidebar
 from .theme_manager import (
     get_theme_manager, ThemeType, THEME_NAMES, THEME_NAME_TO_TYPE, THEME_LIST
 )
@@ -155,63 +152,6 @@ class MedFlowMainWindow(QMainWindow):
         self.tab_widget.setCurrentIndex(0)
         if hasattr(self.schedule_planner, 'show_add_event_dialog'):
             self.schedule_planner.show_add_event_dialog()
-
-    def create_dashboard_tab(self):
-        """Create the main schedule tab with clean 3-pane layout"""
-        dashboard_widget = QWidget()
-        main_layout = QHBoxLayout()
-        main_layout.setSpacing(15)
-        main_layout.setContentsMargins(15, 15, 15, 15)
-
-        # Create splitter for resizable panes
-        splitter = QSplitter(Qt.Horizontal)
-
-        # Left pane - Academic Ledger
-        self.academic_ledger = AcademicLedger(self.db)
-        self.academic_ledger.event_selected.connect(self.on_event_selected)
-        splitter.addWidget(self.academic_ledger)
-
-        # Middle pane - Timer and Active Task
-        middle_pane = QWidget()
-        middle_layout = QVBoxLayout()
-        middle_layout.setSpacing(20)
-        middle_layout.setContentsMargins(20, 20, 20, 20)
-
-        self.pulse_timer = PulseTimer()
-        middle_layout.addWidget(self.pulse_timer)
-
-        # Current task display
-        self.current_task_label = QLabel("No event selected")
-        self.current_task_label.setAlignment(Qt.AlignCenter)
-        middle_layout.addWidget(self.current_task_label)
-
-        middle_pane.setLayout(middle_layout)
-        splitter.addWidget(middle_pane)
-
-        # Right pane - Active Recall Sidebar
-        self.active_recall = ActiveRecallSidebar(self.db)
-        splitter.addWidget(self.active_recall)
-
-        # Set splitter sizes (1:2:1 ratio)
-        splitter.setSizes([400, 800, 400])
-
-        main_layout.addWidget(splitter)
-        dashboard_widget.setLayout(main_layout)
-
-        return dashboard_widget
-
-    def on_event_selected(self, event_id: int):
-        """Handle event selection"""
-        self.active_recall.set_event(event_id)
-
-        # Update current task display
-        events = self.db.get_events()
-        for event in events:
-            if event['id'] == event_id:
-                self.current_task_label.setText(
-                    f"Current: {event['title']} ({event['category']})"
-                )
-                break
 
     def setup_system_tray(self):
         """Setup system tray icon"""

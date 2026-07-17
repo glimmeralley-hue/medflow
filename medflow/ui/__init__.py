@@ -19,6 +19,7 @@ from .flashcard_widget import FlashcardWidget
 from .flashcard_importer import FlashcardImporter
 from .main_window import MedFlowMainWindow
 from .streak_heatmap import StreakHeatmap
+from .style_guide import StyleGuide
 
 __all__ = [
     'CATEGORY_COLORS', 'TIMER_PRESETS', 'EVENT_CATEGORIES',
@@ -37,4 +38,5 @@ __all__ = [
     'FlashcardWidget',
     'StreakHeatmap',
     'MedFlowMainWindow',
+    'StyleGuide',
 ]

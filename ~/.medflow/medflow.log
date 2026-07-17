@@ -238,3 +238,142 @@ AttributeError: 'ThemeManager' object has no attribute 'get_colors'. Did you mea
 2026-07-14 16:34:27 - medflow.database.models - INFO - Saved user profile
 2026-07-14 16:38:58 - medflow.ui.flashcard_importer - ERROR - Error importing APKG: no such column: front
 2026-07-14 16:44:59 - medflow.database.models - INFO - Imported 0 study notes as flashcards into deck 2
+2026-07-14 19:10:41 - main_refactored - INFO - Starting MedFlow application...
+2026-07-14 19:10:41 - medflow.database.connection - INFO - Database connection manager initialized: /home/dyllan/medflow.db
+2026-07-14 19:10:41 - medflow.database.migrations - INFO - Database at version 6, checking for updates...
+2026-07-14 19:10:41 - medflow.database.migrations - INFO - Database is up to date
+2026-07-14 19:10:41 - medflow.database.connection - INFO - Database backup created: /home/dyllan/.local/share/com.medflow.app/backups/medflow_backup_20260714_191041.db
+2026-07-14 19:10:41 - medflow.database.models - INFO - Backup created: /home/dyllan/.local/share/com.medflow.app/backups/medflow_backup_20260714_191041.db
+2026-07-14 19:10:41 - medflow.database.models - INFO - Database initialized: /home/dyllan/medflow.db
+2026-07-14 19:10:41 - main_refactored - INFO - Database initialized successfully
+2026-07-14 19:10:43 - main_refactored - INFO - MedFlow application started successfully
+2026-07-14 19:49:10 - main_refactored - INFO - Starting MedFlow application...
+2026-07-14 19:49:10 - medflow.database.connection - INFO - Database connection manager initialized: /home/dyllan/medflow.db
+2026-07-14 19:49:10 - medflow.database.migrations - INFO - Database at version 6, checking for updates...
+2026-07-14 19:49:10 - medflow.database.migrations - INFO - Database is up to date
+2026-07-14 19:49:10 - medflow.database.connection - INFO - Database backup created: /home/dyllan/.local/share/com.medflow.app/backups/medflow_backup_20260714_194910.db
+2026-07-14 19:49:10 - medflow.database.models - INFO - Backup created: /home/dyllan/.local/share/com.medflow.app/backups/medflow_backup_20260714_194910.db
+2026-07-14 19:49:10 - medflow.database.models - INFO - Database initialized: /home/dyllan/medflow.db
+2026-07-14 19:49:10 - main_refactored - INFO - Database initialized successfully
+2026-07-14 19:49:12 - main_refactored - INFO - MedFlow application started successfully
+2026-07-16 21:18:53 - main_refactored - INFO - Starting MedFlow application...
+2026-07-16 21:18:53 - medflow.database.connection - INFO - Database connection manager initialized: /home/dyllan/medflow.db
+2026-07-16 21:18:53 - medflow.database.migrations - INFO - Database at version 6, checking for updates...
+2026-07-16 21:18:53 - medflow.database.migrations - INFO - Database is up to date
+2026-07-16 21:18:53 - medflow.database.connection - INFO - Database backup created: /home/dyllan/.local/share/com.medflow.app/backups/medflow_backup_20260716_211853.db
+2026-07-16 21:18:53 - medflow.database.models - INFO - Backup created: /home/dyllan/.local/share/com.medflow.app/backups/medflow_backup_20260716_211853.db
+2026-07-16 21:18:53 - medflow.database.models - INFO - Database initialized: /home/dyllan/medflow.db
+2026-07-16 21:18:53 - main_refactored - INFO - Database initialized successfully
+2026-07-16 21:18:54 - main_refactored - ERROR - Failed to start MedFlow: 'ResultsLedger' object has no attribute 'add_group'
+Traceback (most recent call last):
+  File "/home/dyllan/CascadeProjects/medflow/main_refactored.py", line 57, in main
+    window = MedFlowMainWindow(database=db)
+  File "/home/dyllan/CascadeProjects/medflow/medflow/ui/main_window.py", line 57, in __init__
+    self._apply_theme()
+    ~~~~~~~~~~~~~~~~~^^
+  File "/home/dyllan/CascadeProjects/medflow/medflow/ui/main_window.py", line 310, in _apply_theme
+    self.results_ledger._on_theme_changed(theme)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "/home/dyllan/CascadeProjects/medflow/medflow/ui/results.py", line 40, in _on_theme_changed
+    self._apply_theme_styles()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/dyllan/CascadeProjects/medflow/medflow/ui/results.py", line 53, in _apply_theme_styles
+    for group in [self.add_group, self.scores_group, self.graph_group]:
+                  ^^^^^^^^^^^^^^
+AttributeError: 'ResultsLedger' object has no attribute 'add_group'
+2026-07-16 21:21:26 - main_refactored - INFO - Starting MedFlow application...
+2026-07-16 21:21:26 - medflow.database.connection - INFO - Database connection manager initialized: /home/dyllan/medflow.db
+2026-07-16 21:21:26 - medflow.database.migrations - INFO - Database at version 6, checking for updates...
+2026-07-16 21:21:26 - medflow.database.migrations - INFO - Database is up to date
+2026-07-16 21:21:26 - medflow.database.connection - INFO - Database backup created: /home/dyllan/.local/share/com.medflow.app/backups/medflow_backup_20260716_212126.db
+2026-07-16 21:21:26 - medflow.database.models - INFO - Backup created: /home/dyllan/.local/share/com.medflow.app/backups/medflow_backup_20260716_212126.db
+2026-07-16 21:21:26 - medflow.database.models - INFO - Database initialized: /home/dyllan/medflow.db
+2026-07-16 21:21:26 - main_refactored - INFO - Database initialized successfully
+2026-07-16 21:21:28 - main_refactored - ERROR - Failed to start MedFlow: attribute name must be string, not 'PySide6.QtWidgets.QGroupBox'
+Traceback (most recent call last):
+  File "/home/dyllan/CascadeProjects/medflow/main_refactored.py", line 57, in main
+    window = MedFlowMainWindow(database=db)
+  File "/home/dyllan/CascadeProjects/medflow/medflow/ui/main_window.py", line 57, in __init__
+    self._apply_theme()
+    ~~~~~~~~~~~~~~~~~^^
+  File "/home/dyllan/CascadeProjects/medflow/medflow/ui/main_window.py", line 312, in _apply_theme
+    self.results_ledger._on_theme_changed(theme)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "/home/dyllan/CascadeProjects/medflow/medflow/ui/results.py", line 40, in _on_theme_changed
+    self._apply_theme_styles()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/dyllan/CascadeProjects/medflow/medflow/ui/results.py", line 54, in _apply_theme_styles
+    if hasattr(self, group) and group is not None:
+       ~~~~~~~^^^^^^^^^^^^^
+TypeError: attribute name must be string, not 'PySide6.QtWidgets.QGroupBox'
+2026-07-16 21:21:58 - main_refactored - INFO - Starting MedFlow application...
+2026-07-16 21:21:58 - medflow.database.connection - INFO - Database connection manager initialized: /home/dyllan/medflow.db
+2026-07-16 21:21:58 - medflow.database.migrations - INFO - Database at version 6, checking for updates...
+2026-07-16 21:21:58 - medflow.database.migrations - INFO - Database is up to date
+2026-07-16 21:21:58 - medflow.database.connection - INFO - Database backup created: /home/dyllan/.local/share/com.medflow.app/backups/medflow_backup_20260716_212158.db
+2026-07-16 21:21:58 - medflow.database.models - INFO - Backup created: /home/dyllan/.local/share/com.medflow.app/backups/medflow_backup_20260716_212158.db
+2026-07-16 21:21:58 - medflow.database.models - INFO - Database initialized: /home/dyllan/medflow.db
+2026-07-16 21:21:58 - main_refactored - INFO - Database initialized successfully
+2026-07-16 21:22:00 - main_refactored - ERROR - Failed to start MedFlow: 'NotesSection' object has no attribute 'reminders_icon'
+Traceback (most recent call last):
+  File "/home/dyllan/CascadeProjects/medflow/main_refactored.py", line 57, in main
+    window = MedFlowMainWindow(database=db)
+  File "/home/dyllan/CascadeProjects/medflow/medflow/ui/main_window.py", line 57, in __init__
+    self._apply_theme()
+    ~~~~~~~~~~~~~~~~~^^
+  File "/home/dyllan/CascadeProjects/medflow/medflow/ui/main_window.py", line 314, in _apply_theme
+    self.notes_section._on_theme_changed(theme)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "/home/dyllan/CascadeProjects/medflow/medflow/ui/notes.py", line 34, in _on_theme_changed
+    self._apply_theme_styles()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/dyllan/CascadeProjects/medflow/medflow/ui/notes.py", line 223, in _apply_theme_styles
+    self.reminders_icon.setStyleSheet(f"font-size: 20px; font-weight: 700; color: {c['PRIMARY']}; font-family: {IOS_FONT_STACK};")
+    ^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NotesSection' object has no attribute 'reminders_icon'
+2026-07-16 21:22:45 - main_refactored - INFO - Starting MedFlow application...
+2026-07-16 21:22:45 - medflow.database.connection - INFO - Database connection manager initialized: /home/dyllan/medflow.db
+2026-07-16 21:22:45 - medflow.database.migrations - INFO - Database at version 6, checking for updates...
+2026-07-16 21:22:45 - medflow.database.migrations - INFO - Database is up to date
+2026-07-16 21:22:45 - medflow.database.connection - INFO - Database backup created: /home/dyllan/.local/share/com.medflow.app/backups/medflow_backup_20260716_212245.db
+2026-07-16 21:22:45 - medflow.database.models - INFO - Backup created: /home/dyllan/.local/share/com.medflow.app/backups/medflow_backup_20260716_212245.db
+2026-07-16 21:22:45 - medflow.database.models - INFO - Database initialized: /home/dyllan/medflow.db
+2026-07-16 21:22:45 - main_refactored - INFO - Database initialized successfully
+2026-07-16 21:22:46 - main_refactored - INFO - MedFlow application started successfully
+2026-07-16 21:24:45 - medflow.database.models - INFO - Saved user profile
+2026-07-16 21:34:06 - main_refactored - INFO - Starting MedFlow application...
+2026-07-16 21:34:06 - medflow.database.connection - INFO - Database connection manager initialized: /home/dyllan/medflow.db
+2026-07-16 21:34:06 - medflow.database.migrations - INFO - Database at version 6, checking for updates...
+2026-07-16 21:34:06 - medflow.database.migrations - INFO - Database is up to date
+2026-07-16 21:34:06 - medflow.database.connection - INFO - Database backup created: /home/dyllan/.local/share/com.medflow.app/backups/medflow_backup_20260716_213406.db
+2026-07-16 21:34:06 - medflow.database.models - INFO - Backup created: /home/dyllan/.local/share/com.medflow.app/backups/medflow_backup_20260716_213406.db
+2026-07-16 21:34:06 - medflow.database.models - INFO - Database initialized: /home/dyllan/medflow.db
+2026-07-16 21:34:06 - main_refactored - INFO - Database initialized successfully
+2026-07-16 21:34:08 - main_refactored - INFO - MedFlow application started successfully
+2026-07-16 21:36:05 - main_refactored - INFO - Starting MedFlow application...
+2026-07-16 21:36:05 - medflow.database.connection - INFO - Database connection manager initialized: /home/dyllan/medflow.db
+2026-07-16 21:36:05 - medflow.database.migrations - INFO - Database at version 6, checking for updates...
+2026-07-16 21:36:05 - medflow.database.migrations - INFO - Database is up to date
+2026-07-16 21:36:05 - medflow.database.connection - INFO - Database backup created: /home/dyllan/.local/share/com.medflow.app/backups/medflow_backup_20260716_213605.db
+2026-07-16 21:36:05 - medflow.database.models - INFO - Backup created: /home/dyllan/.local/share/com.medflow.app/backups/medflow_backup_20260716_213605.db
+2026-07-16 21:36:05 - medflow.database.models - INFO - Database initialized: /home/dyllan/medflow.db
+2026-07-16 21:36:05 - main_refactored - INFO - Database initialized successfully
+2026-07-16 21:36:07 - main_refactored - INFO - MedFlow application started successfully
+2026-07-16 21:39:27 - main_refactored - INFO - Starting MedFlow application...
+2026-07-16 21:39:27 - medflow.database.connection - INFO - Database connection manager initialized: /home/dyllan/medflow.db
+2026-07-16 21:39:27 - medflow.database.migrations - INFO - Database at version 6, checking for updates...
+2026-07-16 21:39:27 - medflow.database.migrations - INFO - Database is up to date
+2026-07-16 21:39:27 - medflow.database.connection - INFO - Database backup created: /home/dyllan/.local/share/com.medflow.app/backups/medflow_backup_20260716_213927.db
+2026-07-16 21:39:27 - medflow.database.models - INFO - Backup created: /home/dyllan/.local/share/com.medflow.app/backups/medflow_backup_20260716_213927.db
+2026-07-16 21:39:27 - medflow.database.models - INFO - Database initialized: /home/dyllan/medflow.db
+2026-07-16 21:39:27 - main_refactored - INFO - Database initialized successfully
+2026-07-16 21:39:29 - main_refactored - INFO - MedFlow application started successfully
+2026-07-16 22:07:45 - __main__ - INFO - Starting MedFlow application...
+2026-07-16 22:07:45 - medflow.database.connection - INFO - Database connection manager initialized: /home/dyllan/medflow.db
+2026-07-16 22:07:45 - medflow.database.migrations - INFO - Database at version 6, checking for updates...
+2026-07-16 22:07:45 - medflow.database.migrations - INFO - Database is up to date
+2026-07-16 22:07:45 - medflow.database.connection - INFO - Database backup created: /home/dyllan/.local/share/com.medflow.app/backups/medflow_backup_20260716_220745.db
+2026-07-16 22:07:45 - medflow.database.models - INFO - Backup created: /home/dyllan/.local/share/com.medflow.app/backups/medflow_backup_20260716_220745.db
+2026-07-16 22:07:45 - medflow.database.models - INFO - Database initialized: /home/dyllan/medflow.db
+2026-07-16 22:07:45 - __main__ - INFO - Database initialized successfully
+2026-07-16 22:07:48 - __main__ - INFO - MedFlow application started successfully
