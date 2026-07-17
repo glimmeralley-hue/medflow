@@ -27,8 +27,7 @@ PYINSTALLER_OPTS=(
   --name MedFlow
   --add-data "medflow-icon.svg:./"
   --add-data "requirements.txt:./"
-  --add-data "sounds:sounds"
-  main.py
+  main_refactored.py
 )
 
 "$PYTHON" -m PyInstaller "${PYINSTALLER_OPTS[@]}"

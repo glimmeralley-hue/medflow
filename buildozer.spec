@@ -16,7 +16,7 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,svg,wav,txt
 
 # (list) List of inclusions using pattern matching
-source.include_patterns = medflow/*,sounds/*,medflow-icon.svg
+source.include_patterns = medflow/*,medflow-icon.svg
 
 # (list) Source files to exclude (let empty to not exclude anything)
 source.exclude_exts = spec,sh,md

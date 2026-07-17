@@ -2,20 +2,18 @@
 
 
 a = Analysis(
-    ['main.py'],
+    ['main_refactored.py'],
     pathex=[],
     binaries=[],
     datas=[
         ('medflow-icon.svg', './'),
         ('requirements.txt', './'),
-        ('sounds', 'sounds'),
     ],
     hiddenimports=[
         'PySide6.QtCharts',
         'PySide6.QtMultimedia',
         'medflow.ui',
         'medflow.database',
-        'medflow.models',
     ],
     hookspath=[],
     hooksconfig={},
